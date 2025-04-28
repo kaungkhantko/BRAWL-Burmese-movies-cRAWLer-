@@ -6,7 +6,7 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-
+import datetime
 BOT_NAME = "burmese_movies"
 
 SPIDER_MODULES = ["burmese_movies.spiders"]
@@ -21,7 +21,8 @@ ROBOTSTXT_OBEY = True
 DOWNLOAD_DELAY = 1  # be respectful
 FEED_FORMAT = "json"
 FEED_URI = "output/movies.json"
-LOG_FILE = "crawler_output.log"
+now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+LOG_FILE = f"logs/crawler_output_{now}.log"
 LOG_LEVEL = "INFO"
 
 

@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 
-def extract_candidate_blocks(page_source, max_candidates=10):
+def extract_candidate_blocks(page_source, max_candidates=3):
     """Extract top candidate movie blocks from page HTML using simple rules."""
     soup = BeautifulSoup(page_source, 'html.parser')
     candidates = []
