@@ -2,6 +2,7 @@ import os
 import openai
 from dotenv import load_dotenv
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ def query_openai_for_best_selector(candidates, model="gpt-3.5-turbo"):
         # Log the full response
         logger.info(f"[OpenAI Response] {reply_content}")
 
-        selected_index = int(reply_content.split()[0]) - 1
+        selected_index = parse_openai_block_response(reply_content) - 1
         if 0 <= selected_index < len(candidates):
             return selected_index
         else:
@@ -61,4 +62,13 @@ def query_openai_for_best_selector(candidates, model="gpt-3.5-turbo"):
 
     except Exception as e:
         logger.error(f"[OpenAI ERROR] {str(e)}")
+        selected_index = 0
         return 0
+
+def parse_openai_block_response(response_text):
+    """Extract the numeric block ID from OpenAI's response."""
+    match = re.search(r'\d+', response_text)
+    if match:
+        return int(match.group())
+    else:
+        raise ValueError(f"Could not extract block number from OpenAI response: {response_text}")

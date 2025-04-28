@@ -10,6 +10,7 @@ from selenium.webdriver.chrome.options import Options
 from burmese_movies.candidate_extractor import extract_candidate_blocks
 from burmese_movies.openai_selector import query_openai_for_best_selector
 from scrapy import signals
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,9 @@ class MoviesSpider(scrapy.Spider):
     allowed_domains = ["channelmyanmar.to"]
     start_urls = [
         "https://www.channelmyanmar.to/movies/",
-        "https://en.wikipedia.org/wiki/List_of_Burmese_films"
+        "https://en.wikipedia.org/wiki/List_of_Burmese_films",
+        "https://www.imdb.com/search/title/?country_of_origin=MM",
+        "https://www.savemyanmarfilm.org/film-catalogue/"
     ]
 
     @classmethod
@@ -112,27 +115,40 @@ class MoviesSpider(scrapy.Spider):
 
         if self.is_catalogue_page(response):
             self.logger.info("Detected CATALOGUE page. Extracting links...")
-            movie_links = self.extract_movie_links(response)
 
+            movie_links = self.extract_movie_links(response)
             if not movie_links:
                 self.logger.warning("No links found on supposed catalogue page.")
                 return
 
             for link in movie_links:
-                yield response.follow(link, callback=self.parse)  # <-- Notice: always go back to self.parse()
+                yield response.follow(
+                    link,
+                    callback=self.parse,
+                    meta={'source': 'catalogue'},  # 💡 mark how we discovered it
+                    priority=10  # 📈 give catalogue links a base priority
+                )
 
-            # Also handle pagination
+            # Handle pagination links separately (lower priority)
             next_page = response.css('a.next.page-numbers::attr(href)').get()
             if next_page:
                 self.logger.info(f"Found next page: {next_page}")
-                yield response.follow(next_page, callback=self.parse)
+                yield response.follow(
+                    next_page,
+                    callback=self.parse,
+                    meta={'source': 'pagination'},
+                    priority=5  # 📉 pagination is slightly lower priority
+                )
 
         elif self.is_detail_page(response):
             self.logger.info(f"Detected MOVIE DETAIL page: {response.url}")
             yield from self.parse_movie_detail(response)
 
         else:
-            self.logger.warning(f"Unknown page type: {response.url}, skipping.")
+            self.logger.warning(f"Unknown page type: {response.url}")
+            # Fallback
+            yield from self.parse_fallback_with_openai(response)
+
 
     def parse_movie_detail(self, response):
         """Parse an individual movie detail page."""
@@ -260,6 +276,10 @@ class MoviesSpider(scrapy.Spider):
                 if any(x in link.lower() for x in ['contact', 'about', 'privacy', 'terms']):
                     continue
                 if link.endswith(('.jpg', '.png', '.gif')):
+                    continue
+                if link.startswith(('javascript:', '#', 'mailto:')):
+                    continue
+                if not link.startswith(('http', '/')):  # Must be absolute or relative
                     continue
                 clean_links.append(link)
 
