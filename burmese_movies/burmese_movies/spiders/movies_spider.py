@@ -108,28 +108,31 @@ class MoviesSpider(scrapy.Spider):
         return None
 
     def parse(self, response):
-        self.logger.info(f"Parsing rendered page: {response.url}")
+        self.logger.info(f"Parsing page: {response.url}")
 
         if self.is_catalogue_page(response):
-            self.logger.info("Detected catalogue page. Collecting movie links...")
-            for link in self.extract_movie_links(response):
-                yield response.follow(link, callback=self.parse_movie_detail)
+            self.logger.info("Detected CATALOGUE page. Extracting links...")
+            movie_links = self.extract_movie_links(response)
+
+            if not movie_links:
+                self.logger.warning("No links found on supposed catalogue page.")
+                return
+
+            for link in movie_links:
+                yield response.follow(link, callback=self.parse)  # <-- Notice: always go back to self.parse()
+
+            # Also handle pagination
             next_page = response.css('a.next.page-numbers::attr(href)').get()
             if next_page:
                 self.logger.info(f"Found next page: {next_page}")
                 yield response.follow(next_page, callback=self.parse)
-            else:
-                self.logger.info("No next page found. Catalogue scraping complete.")
-
 
         elif self.is_detail_page(response):
-            self.logger.info(f"Detected DETAIL page: {response.url}")
+            self.logger.info(f"Detected MOVIE DETAIL page: {response.url}")
             yield from self.parse_movie_detail(response)
 
         else:
-            self.logger.warning(f"Unknown page type: {response.url}")
-            # Optional fallback: Try OpenAI block parsing if really necessary
-            yield from self.parse_fallback_with_openai(response)
+            self.logger.warning(f"Unknown page type: {response.url}, skipping.")
 
     def parse_movie_detail(self, response):
         """Parse an individual movie detail page."""
@@ -193,10 +196,31 @@ class MoviesSpider(scrapy.Spider):
         yield item
 
     def is_catalogue_page(self, response) -> bool:
-        """Determine if this is a movie catalogue page based on structure."""
-        movie_blocks = response.css('div.item a::attr(href)').getall()
-        poster_imgs = response.css('img[src*="tmdb.org/t/p/"], img[src*="/uploads/"]').getall()
-        return len(movie_blocks) >= 5 or len(poster_imgs) >= 5
+        """Smarter classifier to detect if page is a catalogue page based on structure."""
+
+        num_links = len(response.xpath('//a').getall())
+        num_images = len(response.xpath('//img').getall())
+        num_iframes = len(response.xpath('//iframe').getall())
+        num_paragraphs = len(response.xpath('//p').getall())
+
+        # Print stats for debugging
+        self.logger.info(f"[Page stats] Links: {num_links}, Images: {num_images}, Iframes: {num_iframes}, Paragraphs: {num_paragraphs}")
+
+        # Heuristic rules
+        if num_iframes >= 1 and num_links < 30:
+            return False  # Looks like a movie detail page
+
+        if num_links > 50 and num_iframes == 0:
+            return True  # Big catalogue of movies
+
+        if num_paragraphs > 50 and num_images < 5:
+            return True  # Probably a text-based movie listing
+
+        # Fallback: if very few images and very many links, assume catalogue
+        if num_links > 30 and num_images <= 5:
+            return True
+
+        return False  # Default to detail page
 
     def is_detail_page(self, response) -> bool:
         """Determine if it's a movie detail page based on poster/title/iframe."""
@@ -206,7 +230,58 @@ class MoviesSpider(scrapy.Spider):
         return bool(title and poster and iframe)
 
     def extract_movie_links(self, response):
-        """Extract movie links from a catalogue page."""
-        links = response.css('div.item a::attr(href)').getall()
-        self.logger.info(f"Found {len(links)} movie links on catalogue page.")
-        return list(set(links))  # Remove duplicates
+        """Intelligently extract movie links from a catalogue page with dynamic prioritization."""
+
+        selectors = [
+            'div.item a::attr(href)',
+            'div.card a::attr(href)',
+            'div.movie a::attr(href)',
+            'div.movie-entry a::attr(href)',
+            'div.movie-card a::attr(href)',
+            'div.post-thumb a::attr(href)',
+            'article a::attr(href)',
+            'li a::attr(href)',
+        ]
+
+        candidate_links = {}
+
+        for selector in selectors:
+            links = response.css(selector).getall()
+            if not links:
+                continue
+
+            clean_links = []
+            movie_like_links = 0
+
+            for link in links:
+                link = link.strip()
+                if not link:
+                    continue
+                if any(x in link.lower() for x in ['contact', 'about', 'privacy', 'terms']):
+                    continue
+                if link.endswith(('.jpg', '.png', '.gif')):
+                    continue
+                clean_links.append(link)
+
+                # Movie-like patterns
+                if re.search(r'/movie|/film|/title|/\d{4}|-\d{4}', link.lower()):
+                    movie_like_links += 1
+
+            score = movie_like_links + len(clean_links) * 0.5  # prioritize movie-patterned links, then raw quantity
+            candidate_links[selector] = {
+                "links": clean_links,
+                "score": score
+            }
+
+        if not candidate_links:
+            self.logger.warning("No movie links found across any selector!")
+            return []
+
+        # Pick the best selector
+        best_selector = max(candidate_links.items(), key=lambda x: x[1]['score'])[0]
+        best_links = candidate_links[best_selector]["links"]
+
+        self.logger.info(f"Selected selector '{best_selector}' with {len(best_links)} links (score: {candidate_links[best_selector]['score']}).")
+        
+        return list(set(best_links))  # deduplicate
+
