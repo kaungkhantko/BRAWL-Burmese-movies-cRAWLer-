@@ -4,11 +4,11 @@ import os
 import json
 from datetime import datetime, timezone
 from scrapy.http import HtmlResponse
-from burmese_movies.items import BurmeseMoviesItem, FIELD_SELECTORS
+from burmese_movies_crawler.items import BurmeseMoviesItem, FIELD_SELECTORS
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from burmese_movies.candidate_extractor import extract_candidate_blocks
-from burmese_movies.openai_selector import query_openai_for_best_selector
+from burmese_movies_crawler.candidate_extractor import extract_candidate_blocks
+from burmese_movies_crawler.openai_selector import query_openai_for_best_selector
 from scrapy import signals
 import re
 
