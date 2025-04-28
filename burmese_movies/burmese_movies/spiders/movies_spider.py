@@ -28,7 +28,7 @@ class MoviesSpider(scrapy.Spider):
         crawler.signals.connect(spider.open_spider, signal=signals.spider_opened)
         crawler.signals.connect(spider.close_spider, signal=signals.spider_closed)
 
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
         output_base = "output"
         output_dir = os.path.join(output_base, timestamp)
         os.makedirs(output_dir, exist_ok=True)
@@ -74,7 +74,7 @@ class MoviesSpider(scrapy.Spider):
             logger.info("Chrome Driver closed.")
 
         self.end_time = datetime.now(timezone.utc)
-        runtime_seconds = (self.end_time - self.start_time).total_seconds()
+        runtime_seconds = (self.end_time - self.start_time).total_seconds() if self.start_time else None
 
         summary = {
             "spider_name": self.name,
@@ -88,11 +88,13 @@ class MoviesSpider(scrapy.Spider):
             "log_file": self.log_file,
             "close_reason": reason
         }
-
-        with open(self.summary_file, "w", encoding="utf-8") as f:
-            json.dump(summary, f, indent=4, ensure_ascii=False)
-
-        logger.info(f"Run summary saved to: {self.summary_file}")
+        try:
+            summary_path = os.path.join(self.output_dir, f"run_summary_{self.timestamp}.json")
+            with open(summary_path, "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=4, ensure_ascii=False)
+            logger.info(f"Run summary saved to: {summary_path}")
+        except Exception as e:
+            logger.error(f"Failed to save run summary: {e}")
 
     def extract_with_fallback(self, response, selectors, field_name):
         for sel in selectors:
