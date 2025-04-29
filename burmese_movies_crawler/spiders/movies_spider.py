@@ -2,15 +2,16 @@ import scrapy
 import logging
 import os
 import json
+import re
 from datetime import datetime, timezone
 from scrapy.http import HtmlResponse
-from burmese_movies_crawler.items import BurmeseMoviesItem, FIELD_SELECTORS
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from fuzzywuzzy import process
+from scrapy import signals
+from burmese_movies_crawler.items import BurmeseMoviesItem, FIELD_SELECTORS
 from burmese_movies_crawler.candidate_extractor import extract_candidate_blocks
 from burmese_movies_crawler.openai_selector import query_openai_for_best_selector
-from scrapy import signals
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -24,43 +25,58 @@ class MoviesSpider(scrapy.Spider):
         "https://www.savemyanmarfilm.org/film-catalogue/"
     ]
 
+    MOVIE_DETAIL_FIELD_MAPPING = {
+        'director': ['director', 'directed by', 'filmmaker'],
+        'cast': ['cast', 'actors', 'starring'],
+        'genre': ['genre', 'category', 'type'],
+        'synopsis': ['synopsis', 'story', 'plot'],
+    }
+
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super().from_crawler(crawler, *args, **kwargs)
-
+        spider.crawler.settings.set('FEEDS', {spider.movies_output_file: {'format': 'json', 'encoding': 'utf8', 'overwrite': False}}, priority='spider')
         crawler.signals.connect(spider.open_spider, signal=signals.spider_opened)
         crawler.signals.connect(spider.close_spider, signal=signals.spider_closed)
-
-        timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-        output_base = "output"
-        output_dir = os.path.join(output_base, timestamp)
-        os.makedirs(output_dir, exist_ok=True)
-
-        spider.timestamp = timestamp
-        spider.output_base = output_base
-        spider.output_dir = output_dir
-        spider.movies_output_file = os.path.join(spider.output_dir, f"movies_{timestamp}.json")
-        spider.log_file = os.path.join(spider.output_dir, f"crawler_output_{timestamp}.log")
-        spider.summary_file = os.path.join(spider.output_dir, f"run_summary_{timestamp}.json")
-        spider.start_time = None
-        spider.end_time = None
-        spider.warnings = []
-        spider.errors = []
-        spider.items_scraped = 0
-
-        crawler.settings.set('FEEDS', {
-            spider.movies_output_file: {
-                'format': 'json',
-                'encoding': 'utf8',
-                'overwrite': False,
-            }
-        }, priority='spider')
-
         return spider
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.driver = None
+        self._setup_paths()
+        self.start_time = None
+        self.end_time = None
+        self.warnings, self.errors = [], []
+        self.items_scraped = 0
+        self.invalid_links = []
+        
+        self.DEFAULT_RULE_THRESHOLDS = {
+            'link_heavy_min_links': 50,
+            'link_heavy_max_iframes': 0,
+            'text_heavy_min_paragraphs': 50,
+            'text_heavy_max_images': 5,
+            'fallback_min_links': 30,
+            'fallback_max_images': 5,
+            'table_min_rows': 3,
+            'score_threshold': 4,  # minimum points to be classified as catalogue
+        }
+
+        self.CATALOGUE_RULES = [
+            ("link_heavy", self._rule_link_heavy, 2),
+            ("text_heavy", self._rule_text_heavy, 2),
+            ("table_catalogue", self._rule_table_catalogue, 3),
+            ("fallback_links", self._rule_fallback_links, 1)
+        ]
+
+    def _setup_paths(self):
+        timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+        output_base = "output"
+        self.timestamp = timestamp
+        self.output_dir = os.path.join(output_base, timestamp)
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.movies_output_file = os.path.join(self.output_dir, f"movies_{timestamp}.json")
+        self.log_file = os.path.join(self.output_dir, f"crawler_output_{timestamp}.log")
+        self.summary_file = os.path.join(self.output_dir, f"run_summary_{timestamp}.json")
 
     def open_spider(self, spider):
         chrome_options = Options()
@@ -74,16 +90,22 @@ class MoviesSpider(scrapy.Spider):
     def close_spider(self, spider, reason):
         if self.driver:
             self.driver.quit()
-            logger.info("Chrome Driver closed.")
-
         self.end_time = datetime.now(timezone.utc)
-        runtime_seconds = (self.end_time - self.start_time).total_seconds() if self.start_time else None
+        self._save_run_summary(reason)
 
+        if self.invalid_links:
+            invalid_links_path = os.path.join(self.output_dir, f"invalid_links_{self.timestamp}.json")
+            with open(invalid_links_path, "w", encoding="utf-8") as f:
+                json.dump(self.invalid_links, f, indent=4, ensure_ascii=False)
+            logger.info(f"Saved {len(self.invalid_links)} invalid links to {invalid_links_path}")
+
+
+    def _save_run_summary(self, reason):
         summary = {
             "spider_name": self.name,
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
-            "runtime_seconds": runtime_seconds,
+            "runtime_seconds": (self.end_time - self.start_time).total_seconds() if self.start_time else None,
             "items_scraped": self.items_scraped,
             "warnings": self.warnings,
             "errors": self.errors,
@@ -91,217 +113,264 @@ class MoviesSpider(scrapy.Spider):
             "log_file": self.log_file,
             "close_reason": reason
         }
-        try:
-            summary_path = os.path.join(self.output_dir, f"run_summary_{self.timestamp}.json")
-            with open(summary_path, "w", encoding="utf-8") as f:
-                json.dump(summary, f, indent=4, ensure_ascii=False)
-            logger.info(f"Run summary saved to: {summary_path}")
-        except Exception as e:
-            logger.error(f"Failed to save run summary: {e}")
-
-    def extract_with_fallback(self, response, selectors, field_name):
-        for sel in selectors:
-            data = response.css(sel).get()
-            if data:
-                logger.info(f"[Matched] Field '{field_name}' → Selector '{sel}'")
-                return data.strip()
-        warning_msg = f"[Missing] Field '{field_name}' - No selector matched"
-        logger.warning(warning_msg)
-        self.warnings.append(warning_msg)
-        return None
+        with open(self.summary_file, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=4, ensure_ascii=False)
+        logger.info(f"Run summary saved to: {self.summary_file}")
 
     def parse(self, response):
-        self.logger.info(f"Parsing page: {response.url}")
-
+        logger.info(f"Parsing page: {response.url}")
         if self.is_catalogue_page(response):
-            self.logger.info("Detected CATALOGUE page. Extracting links...")
-
-            movie_links = self.extract_movie_links(response)
-            if not movie_links:
-                self.logger.warning("No links found on supposed catalogue page.")
-                return
-
-            for link in movie_links:
-                yield response.follow(
-                    link,
-                    callback=self.parse,
-                    meta={'source': 'catalogue'},  # 💡 mark how we discovered it
-                    priority=10  # 📈 give catalogue links a base priority
-                )
-
-            # Handle pagination links separately (lower priority)
-            next_page = response.css('a.next.page-numbers::attr(href)').get()
-            if next_page:
-                self.logger.info(f"Found next page: {next_page}")
-                yield response.follow(
-                    next_page,
-                    callback=self.parse,
-                    meta={'source': 'pagination'},
-                    priority=5  # 📉 pagination is slightly lower priority
-                )
-
+            yield from self.parse_catalogue(response)
         elif self.is_detail_page(response):
-            self.logger.info(f"Detected MOVIE DETAIL page: {response.url}")
-            yield from self.parse_movie_detail(response)
-
+            yield from self.parse_detail(response)
         else:
-            self.logger.warning(f"Unknown page type: {response.url}")
-            # Fallback
-            yield from self.parse_fallback_with_openai(response)
+            yield from self.parse_unknown(response)
 
+    def parse_catalogue(self, response):
+        tables = response.css('table')
+        if tables and len(response.css('table tbody tr')) >= 3:
+            logger.info(f"Detected static table with {len(tables[0].css('tbody tr'))} rows.")
+            yield from self.extract_from_table(response, tables[0])
+            return
+        links = self.extract_links(response)
+        for link in links:
+            yield response.follow(link, callback=self.parse, meta={'source': 'catalogue'}, priority=10)
+        next_page = response.css('a.next.page-numbers::attr(href)').get()
+        if next_page:
+            yield response.follow(next_page, callback=self.parse, meta={'source': 'pagination'}, priority=5)
 
-    def parse_movie_detail(self, response):
-        """Parse an individual movie detail page."""
+    def parse_detail(self, response):
         item = BurmeseMoviesItem()
-
-        # Title
-        item['title'] = response.css('h1.entry-title::text, h1.title::text, div.movie-title::text').get(default='').strip()
-
-        # Year
-        item['year'] = response.css('.ytps::text, span[class*="year"]::text').get(default='').strip()
-
-        # Director, Cast, Genre (split paragraphs)
-        paragraphs = response.css('div.entry-content p::text').getall()
-        for paragraph in paragraphs:
-            paragraph = paragraph.strip()
-            if 'Director' in paragraph:
-                item['director'] = paragraph.replace('Director:', '').strip()
-            if 'Cast' in paragraph:
-                item['cast'] = paragraph.replace('Cast:', '').strip()
-            if 'Genre' in paragraph:
-                item['genre'] = paragraph.replace('Genre:', '').strip()
-
-        # Synopsis (first non-metadata paragraph)
-        for paragraph in paragraphs:
-            if all(keyword not in paragraph for keyword in ['Director', 'Cast', 'Genre']):
-                item['synopsis'] = paragraph.strip()
-                break
-
-        # Poster
-        item['poster_url'] = response.css('div.entry-content img::attr(src)').get()
-
-        # Streaming link
-        item['streaming_link'] = response.css('iframe::attr(src)').get()
-
+        item.update(self.extract_main_fields(response))
+        item.update(self.extract_paragraphs(response))
         yield item
         self.items_scraped += 1
 
-    def parse_fallback_with_openai(self, response):
-        """If structure is unclear, fallback to OpenAI candidate block selection."""
+    def parse_unknown(self, response):
+        logger.warning(f"Unknown page structure: {response.url}")
         candidates = extract_candidate_blocks(response.text)
-        self.logger.info(f"Extracted {len(candidates)} candidate blocks.")
-
         if not candidates:
-            self.logger.warning("No candidates extracted, skipping page.")
             return
+        best_block_html = candidates[query_openai_for_best_selector(candidates)]
+        fake_response = HtmlResponse(url=response.url, body=best_block_html, encoding='utf-8')
+        yield from self.parse_detail(fake_response)
 
-        try:
-            best_index = query_openai_for_best_selector(candidates)
-            self.logger.info(f"OpenAI selected Block #{best_index + 1} for movie parsing.")
-        except Exception as e:
-            self.logger.error(f"OpenAI query failed: {e}")
-            best_index = 0  # fallback to first block
+    def is_catalogue_page(self, response):
+        stats = {
+            'links': len(response.xpath('//a')),
+            'images': len(response.xpath('//img')),
+            'iframes': len(response.xpath('//iframe')),
+            'paragraphs': len(response.xpath('//p')),
+            'tables': len(response.xpath('//table'))
+        }
+        logger.info(f"[Page stats] {stats}")
 
-        best_block_html = candidates[best_index]
-        best_response = HtmlResponse(url=response.url, body=best_block_html, encoding='utf-8')
+        if not self._rule_detail_like(stats):
+            logger.info("Page likely a DETAIL page.")
+            return False
 
-        item = BurmeseMoviesItem()
-        for field, selectors in FIELD_SELECTORS.items():
-            value = self.extract_with_fallback(best_response, selectors, field)
-            item[field] = value
-        yield item
+        rule_results = self.evaluate_catalogue_rules(response, stats)
 
-    def is_catalogue_page(self, response) -> bool:
-        """Smarter classifier to detect if page is a catalogue page based on structure."""
+        score = self.compute_catalogue_score(rule_results, method=self.DEFAULT_RULE_THRESHOLDS.get('scoring_method', 'sum'))
 
-        num_links = len(response.xpath('//a').getall())
-        num_images = len(response.xpath('//img').getall())
-        num_iframes = len(response.xpath('//iframe').getall())
-        num_paragraphs = len(response.xpath('//p').getall())
+        if isinstance(score, bool):
+            return score  # For strict_majority style
 
-        # Print stats for debugging
-        self.logger.info(f"[Page stats] Links: {num_links}, Images: {num_images}, Iframes: {num_iframes}, Paragraphs: {num_paragraphs}")
+        threshold = self.DEFAULT_RULE_THRESHOLDS.get('score_threshold', 3)
+        logger.info(f"[Catalogue Score] {score} (Threshold={threshold})")
 
-        # Heuristic rules
-        if num_iframes >= 1 and num_links < 30:
-            return False  # Looks like a movie detail page
+        return score >= threshold
 
-        if num_links > 50 and num_iframes == 0:
-            return True  # Big catalogue of movies
+    def evaluate_catalogue_rules(self, response, stats):
+        """Evaluate all rules and collect their boolean outcomes."""
+        results = []
 
-        if num_paragraphs > 50 and num_images < 5:
-            return True  # Probably a text-based movie listing
+        for name, rule_fn, weight in self.CATALOGUE_RULES:
+            try:
+                if name == "table_catalogue":
+                    passed = rule_fn(response, stats)
+                else:
+                    passed = rule_fn(stats)
+                results.append({
+                    'name': name,
+                    'passed': passed,
+                    'weight': weight
+                })
+                logger.info(f"[Rule {name}] Passed={passed} (weight {weight})")
+            except Exception as e:
+                logger.error(f"[Rule Error] {name}: {e}")
+                results.append({
+                    'name': name,
+                    'passed': False,
+                    'weight': weight
+                })
 
-        # Fallback: if very few images and very many links, assume catalogue
-        if num_links > 30 and num_images <= 5:
-            return True
+        return results
 
-        return False  # Default to detail page
+    def compute_catalogue_score(self, rule_results, method="sum"):
+        """Compute catalogue confidence score based on chosen method."""
 
-    def is_detail_page(self, response) -> bool:
-        """Determine if it's a movie detail page based on poster/title/iframe."""
-        title = response.css('h1.entry-title, h1.title, div.movie-title').get()
-        poster = response.css('img.poster, img.cover, div.entry-content img').get()
-        iframe = response.css('iframe').get()
-        return bool(title and poster and iframe)
+        if method == "sum":
+            total = sum(r['weight'] for r in rule_results if r['passed'])
+            logger.info(f"[Scoring] SUM method score = {total}")
+            return total
 
-    def extract_movie_links(self, response):
-        """Intelligently extract movie links from a catalogue page with dynamic prioritization."""
+        elif method == "weighted_average":
+            max_possible = sum(r['weight'] for r in rule_results)
+            achieved = sum(r['weight'] for r in rule_results if r['passed'])
+            score = (achieved / max_possible) * 100 if max_possible > 0 else 0
+            logger.info(f"[Scoring] WEIGHTED AVERAGE method score = {score:.2f}")
+            return score
 
+        elif method == "strict_majority":
+            passes = sum(1 for r in rule_results if r['passed'])
+            majority = passes >= (len(rule_results) / 2)
+            logger.info(f"[Scoring] STRICT MAJORITY method = {majority}")
+            return majority
+
+        else:
+            logger.warning(f"[Scoring] Unknown method '{method}'. Defaulting to SUM.")
+            return sum(r['weight'] for r in rule_results if r['passed'])
+
+    def _extract_page_stats(self, response):
+        """Extract basic counts from a page."""
+        return {
+            'links': len(response.xpath('//a')),
+            'images': len(response.xpath('//img')),
+            'iframes': len(response.xpath('//iframe')),
+            'paragraphs': len(response.xpath('//p')),
+            'tables': len(response.xpath('//table')),
+        }
+    
+    def _rule_detail_like(self, stats):
+        """Negative rule: if iframes exist and few links."""
+        return not (stats['iframes'] >= 1 and stats['links'] < 30)
+
+    def _rule_link_heavy(self, stats):
+        """Positive rule: many links, no iframes."""
+        return stats['links'] > self.DEFAULT_RULE_THRESHOLDS['link_heavy_min_links'] and \
+            stats['iframes'] <= self.DEFAULT_RULE_THRESHOLDS['link_heavy_max_iframes']
+
+    def _rule_text_heavy(self, stats):
+        """Positive rule: lots of paragraphs, few images."""
+        return stats['paragraphs'] > self.DEFAULT_RULE_THRESHOLDS['text_heavy_min_paragraphs'] and \
+            stats['images'] <= self.DEFAULT_RULE_THRESHOLDS['text_heavy_max_images']
+
+    def _rule_table_catalogue(self, response, stats):
+        """Positive rule: static table structure detected."""
+        if stats['tables'] >= 1:
+            rows = response.css('table tbody tr')
+            if len(rows) >= self.DEFAULT_RULE_THRESHOLDS['table_min_rows']:
+                logger.info("Detected TABLE catalogue with multiple rows.")
+                return True
+        return False
+
+    def _rule_fallback_links(self, stats):
+        """Positive rule: fallback moderate link-heavy."""
+        return stats['links'] > self.DEFAULT_RULE_THRESHOLDS['fallback_min_links'] and \
+            stats['images'] <= self.DEFAULT_RULE_THRESHOLDS['fallback_max_images']
+
+    def is_detail_page(self, response):
+        return bool(response.css('h1.entry-title, h1.title, div.movie-title').get())
+
+    def extract_links(self, response):
         selectors = [
-            'div.item a::attr(href)',
-            'div.card a::attr(href)',
-            'div.movie a::attr(href)',
-            'div.movie-entry a::attr(href)',
-            'div.movie-card a::attr(href)',
-            'div.post-thumb a::attr(href)',
-            'article a::attr(href)',
-            'li a::attr(href)',
+            'div.item a::attr(href)', 'div.card a::attr(href)', 'div.movie a::attr(href)',
+            'div.movie-entry a::attr(href)', 'div.movie-card a::attr(href)',
+            'article a::attr(href)', 'li a::attr(href)'
         ]
-
-        candidate_links = {}
-
+        links = []
         for selector in selectors:
-            links = response.css(selector).getall()
-            if not links:
+            links.extend(response.css(selector).getall())
+
+        unique_links = set()
+        for link in links:
+            if self.is_valid_link(link) and (link.startswith('/') or link.startswith('http')):
+                unique_links.add(link)
+
+        logger.info(f"Extracted {len(unique_links)} valid links after filtering.")
+        return list(unique_links)
+
+    def extract_main_fields(self, response):
+        fields = {
+            'title': ['h1.entry-title::text', 'h1.title::text', 'div.movie-title::text'],
+            'year': ['.ytps::text', 'span[class*="year"]::text'],
+            'poster_url': ['div.entry-content img::attr(src)'],
+            'streaming_link': ['iframe::attr(src)']
+        }
+        return {field: self._extract_first(response, selectors) for field, selectors in fields.items()}
+
+    def extract_paragraphs(self, response):
+        data, used = {}, set()
+        for text in response.css('div.entry-content p::text').getall():
+            clean = text.strip()
+            field, score = self._match_field(clean)
+            if field and field not in used and score > 70:
+                data[field] = self._clean_text(clean)
+                used.add(field)
+        return data
+
+    def extract_from_table(self, response, table):
+        headers = [h.strip() for h in table.css('thead th::text, thead td::text').getall() if h.strip()]
+        header_map = self._map_headers(headers)
+        for row in table.css('tbody tr'):
+            cells = [c.strip() for c in row.css('td::text, td *::text').getall() if c.strip()]
+            if len(cells) != len(headers):
                 continue
+            item = BurmeseMoviesItem()
+            for head, value in zip(headers, cells):
+                field = header_map.get(head)
+                if field:
+                    item[field] = value
+            if item.get('title'):
+                yield item
+                self.items_scraped += 1
 
-            clean_links = []
-            movie_like_links = 0
+    def _map_headers(self, headers):
+        mapping = {
+            'title': ['title', 'film title', 'film', 'movie'],
+            'year': ['year', 'release year', 'film year'],
+            'director': ['director', 'directed by', 'filmmaker'],
+            'genre': ['genre', 'type', 'category']
+        }
+        results = {}
+        for head in headers:
+            for field, candidates in mapping.items():
+                match, score = process.extractOne(head.lower(), candidates)
+                if score > 70:
+                    results[head] = field
+        return results
 
-            for link in links:
-                link = link.strip()
-                if not link:
-                    continue
-                if any(x in link.lower() for x in ['contact', 'about', 'privacy', 'terms']):
-                    continue
-                if link.endswith(('.jpg', '.png', '.gif')):
-                    continue
-                if link.startswith(('javascript:', '#', 'mailto:')):
-                    continue
-                if not link.startswith(('http', '/')):  # Must be absolute or relative
-                    continue
-                clean_links.append(link)
+    def _extract_first(self, response, selectors):
+        for sel in selectors:
+            value = response.css(sel).get()
+            if value:
+                return value.strip()
+        return None
 
-                # Movie-like patterns
-                if re.search(r'/movie|/film|/title|/\d{4}|-\d{4}', link.lower()):
-                    movie_like_links += 1
+    def _match_field(self, text):
+        best, score = None, 0
+        for field, candidates in self.MOVIE_DETAIL_FIELD_MAPPING.items():
+            match, match_score = process.extractOne(text.lower(), candidates)
+            if match_score > score:
+                best, score = field, match_score
+        return best, score
 
-            score = movie_like_links + len(clean_links) * 0.5  # prioritize movie-patterned links, then raw quantity
-            candidate_links[selector] = {
-                "links": clean_links,
-                "score": score
-            }
+    def _clean_text(self, text):
+        return text.split(':', 1)[-1].strip() if ':' in text else text
 
-        if not candidate_links:
-            self.logger.warning("No movie links found across any selector!")
-            return []
-
-        # Pick the best selector
-        best_selector = max(candidate_links.items(), key=lambda x: x[1]['score'])[0]
-        best_links = candidate_links[best_selector]["links"]
-
-        self.logger.info(f"Selected selector '{best_selector}' with {len(best_links)} links (score: {candidate_links[best_selector]['score']}).")
-        
-        return list(set(best_links))  # deduplicate
+    def is_valid_link(self, url):
+        if not url:
+            self.invalid_links.append(("Empty URL", url))
+            return False
+        if url.startswith('javascript:'):
+            self.invalid_links.append(("Javascript link", url))
+            return False
+        if url.startswith('#'):
+            self.invalid_links.append(("Fragment link", url))
+            return False
+        if url.lower().strip() in ['void(0)', 'none', '']:
+            self.invalid_links.append(("Placeholder text", url))
+            return False
+        return True
 
