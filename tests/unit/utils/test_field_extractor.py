@@ -2,6 +2,38 @@ import pytest
 from scrapy.http import HtmlResponse, Request
 from burmese_movies_crawler.utils.field_extractor import FieldExtractor
 from burmese_movies_crawler.items import BurmeseMoviesItem
+from burmese_movies_crawler.utils.field_mapping_loader import load_field_mapping
+
+def test_yaml_field_mapping_structure():
+    movie_mapping = load_field_mapping("movies")
+    assert isinstance(movie_mapping, dict)
+    assert "title" in movie_mapping
+    assert isinstance(movie_mapping["title"]["labels"], list)
+
+@pytest.mark.parametrize("headers,expected", [
+    (["Film Title", "Release Year", "Directed By", "Genre"],
+     {"Film Title": "title", "Release Year": "year", "Directed By": "director", "Genre": "genre"}),
+
+    (["ဇာတ်ကားအမည်", "နှစ်", "ဒါရိုက်တာ", "အမျိုးအစား"],
+     {"ဇာတ်ကားအမည်": "title", "နှစ်": "year", "ဒါရိုက်တာ": "director", "အမျိုးအစား": "genre"}),
+
+    (["Titre du film", "Année de sortie", "Réalisateur", "Catégorie"],
+     {"Titre du film": "title", "Année de sortie": "year", "Réalisateur": "director", "Catégorie": "genre"})
+])
+def test_map_headers_with_yaml(headers, expected):
+    fe = FieldExtractor(content_type="movies")
+    assert fe._map_headers(headers) == expected
+
+@pytest.mark.parametrize("text,expected_field", [
+    ("Director: John Doe", "director"),
+    ("အမျိုးအစား - Drama", "genre"),
+    ("Titre du film: La Haine", "title")
+])
+def test_match_field_with_yaml(text, expected_field):
+    fe = FieldExtractor(content_type="movies")
+    field, score = fe._match_field(text)
+    assert field == expected_field
+    assert score >= 70
 
 @pytest.fixture
 def extractor():
@@ -373,3 +405,32 @@ def test_extract_from_table_variants(extractor, html, mapped_headers, expected, 
         assert isinstance(item, BurmeseMoviesItem)
         for field, value in expected_values.items():
             assert item.get(field) == value
+
+def test_map_headers():
+    fe = FieldExtractor()
+    headers = ['Film Title', 'Release Year', 'Directed By', 'Genre']
+    mapped = fe._map_headers(headers)
+    assert mapped == {
+        'Film Title': 'title',
+        'Release Year': 'year',
+        'Directed By': 'director',
+        'Genre': 'genre'
+    }
+
+def test_match_field():
+    fe = FieldExtractor()
+    field, score = fe._match_field("Directed by John Doe")
+    assert field == "director"
+    assert score > 70
+
+def test_clean_text_colon_split():
+    fe = FieldExtractor()
+    assert fe._clean_text("Director: John Doe") == "John Doe"
+
+def test_clean_text_dash_split():
+    fe = FieldExtractor()
+    assert fe._clean_text("Genre – Action") == "Action"
+
+def test_clean_text_no_split():
+    fe = FieldExtractor()
+    assert fe._clean_text("Action") == "Action"

@@ -10,9 +10,11 @@ import logging
 logger = logging.getLogger(__name__)
 def handle_page(html: str, url: str,
                 classifier: PageClassifier,
-                extractor: FieldExtractor) -> dict:
+                extractor: FieldExtractor,
+                content_type: str = "movies") -> dict:
 
     response = HtmlResponse(url=url, body=html, encoding='utf-8')
+
     if classifier.is_catalogue_page(response): 
         links = extractor.extract_links(response)
         next_page = response.css('a.next.page-numbers::attr(href)').get()

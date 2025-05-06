@@ -31,13 +31,6 @@ class MoviesSpider(scrapy.Spider):
         "https://www.savemyanmarfilm.org/film-catalogue/"
     ]
 
-    MOVIE_DETAIL_FIELD_MAPPING = {
-        'director': ['director', 'directed by', 'filmmaker'],
-        'cast': ['cast', 'actors', 'starring'],
-        'genre': ['genre', 'category', 'type'],
-        'synopsis': ['synopsis', 'story', 'plot'],
-    }
-
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         spider = super().from_crawler(crawler, *args, **kwargs)
@@ -75,7 +68,7 @@ class MoviesSpider(scrapy.Spider):
         ]
 
         self.classifier = PageClassifier(self.DEFAULT_RULE_THRESHOLDS, self.CATALOGUE_RULES)
-        self.extractor = FieldExtractor(self.invalid_links)
+        self.extractor = FieldExtractor(content_type='movies', invalid_links=self.invalid_links)
 
     def _setup_paths(self):
         timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))

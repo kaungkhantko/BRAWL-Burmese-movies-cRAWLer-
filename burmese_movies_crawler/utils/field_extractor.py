@@ -1,36 +1,17 @@
 import logging
 import re
 from urllib.parse import urldefrag
-
 from fuzzywuzzy import process
-from burmese_movies_crawler.items import FIELD_SELECTORS, BurmeseMoviesItem
+from burmese_movies_crawler.items import BurmeseMoviesItem
 from .link_utils import is_valid_link
-
+from .field_mapping_loader import load_field_mapping
 logger = logging.getLogger(__name__)
 
 class FieldExtractor:
-    def __init__(self, invalid_links=None):
+    def __init__(self, invalid_links=None, content_type="movies",):
         self.invalid_links = invalid_links if invalid_links is not None else []
         self.items_scraped = 0
-
-        self.CATALOGUE_FIELD_MAPPING = {
-            'title': ['h1.entry-title::text', 'h1.title::text', 'div.movie-title::text'],
-            'year': ['.ytps::text', 'span[class*="year"]::text'],
-            'poster_url': ['div.entry-content img::attr(src)'],
-            'streaming_link': ['iframe::attr(src)']
-        }
-
-        self.MOVIE_DETAIL_FIELD_MAPPING = {
-            'title': ['title', 'film title', 'film', 'movie'],
-            'year': ['year', 'release year', 'film year'],
-            'director': ['director', 'directed by', 'filmmaker'],
-            'genre': ['genre', 'type', 'category']
-        }
-
-        self.field_mapping = {}
-        self.field_mapping.update(FIELD_SELECTORS)
-        self.field_mapping.update(self.MOVIE_DETAIL_FIELD_MAPPING)
-        self.field_mapping.update(self.CATALOGUE_FIELD_MAPPING)
+        self.label_mapping = load_field_mapping(content_type)
 
     def extract_links(self, response):
         selectors = [
@@ -107,25 +88,21 @@ class FieldExtractor:
                 self.items_scraped += 1
 
     def _map_headers(self, headers):
-        mapping = {
-            'title': ['title', 'film title', 'film', 'movie', 'ဇာတ်ကားအမည်'],
-            'year': ['year', 'release year', 'film year', 'နှစ်'],
-            'director': ['director', 'directed by', 'filmmaker', 'ဒါရိုက်တာ', 'réalisateur'],
-            'genre': ['genre', 'type', 'category', 'အမျိုးအစား']
-        }
         results = {}
         for head in headers:
-            for field, candidates in mapping.items():
-                match, score = process.extractOne(head.lower(), candidates)
-                if score > 70:
+            for field, meta in self.label_mapping.items():
+                match, score = process.extractOne(head.lower(), meta["labels"])
+                threshold = meta.get("confidence_threshold", 70)
+                if score >= threshold:
                     results[head] = field
         return results
 
     def _match_field(self, text):
         best, score = None, 0
-        for field, candidates in self.MOVIE_DETAIL_FIELD_MAPPING.items():
-            match, match_score = process.extractOne(text.lower(), candidates)
-            if match_score > score:
+        for field, meta in self.label_mapping.items():
+            match, match_score = process.extractOne(text.lower(), meta["labels"])
+            threshold = meta.get("confidence_threshold", 70)
+            if match_score > score and match_score >= threshold:
                 best, score = field, match_score
         return best, score
 

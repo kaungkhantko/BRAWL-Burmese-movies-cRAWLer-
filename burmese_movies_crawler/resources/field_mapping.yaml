@@ -1,0 +1,135 @@
+content_types:
+
+  movies:
+    title:
+      labels:
+        - "Title"
+        - "Film Title"
+        - "Movie"
+        - "ဇာတ်ကားအမည်"
+        - "Titre du film"
+        - "映画タイトル"
+      type: string
+      required: true
+      confidence_threshold: 70
+
+    year:
+      labels:
+        - "Year"
+        - "Release Year"
+        - "နှစ်"
+        - "Année de sortie"
+        - "年"
+      type: integer
+      format: yyyy
+      required: false
+
+    director:
+      labels:
+        - "Director"
+        - "Directed By"
+        - "Filmmaker"
+        - "ဒါရိုက်တာ"
+        - "Réalisateur"
+      type: string
+      required: false
+
+    genre:
+      labels:
+        - "Genre"
+        - "Category"
+        - "Type"
+        - "အမျိုးအစား"
+        - "ジャンル"
+      type: categorical
+      required: false
+
+    duration:
+      labels:
+        - "Duration"
+        - "Running Time"
+        - "Runtime"
+        - "ချိန်အကြာ"
+        - "Durée"
+      type: string
+      required: false
+
+    cast:
+      labels:
+        - "Cast"
+        - "Actors"
+        - "Starring"
+        - "အဖြစ်ဆောင်"
+        - "Acteurs"
+      type: list
+      required: false
+
+  games:
+    title:
+      labels:
+        - "Game Title"
+        - "Title"
+        - "နာမည်"
+        - "Nom du jeu"
+        - "ゲームタイトル"
+      type: string
+      required: true
+      confidence_threshold: 70
+
+    developer:
+      labels:
+        - "Developer"
+        - "Game Studio"
+        - "တီထွင်သူ"
+        - "Développeur"
+        - "開発者"
+      type: string
+      required: true
+
+    publisher:
+      labels:
+        - "Publisher"
+        - "发行商"
+        - "Éditeur"
+        - "Publisher Name"
+      type: string
+      required: false
+
+    platform:
+      labels:
+        - "Platform"
+        - "Console"
+        - "Device"
+        - "游戏平台"
+        - "Plateforme"
+      type: categorical
+      required: true
+
+    genre:
+      labels:
+        - "Genre"
+        - "Game Type"
+        - "Game Category"
+        - "အမျိုးအစား"
+        - "ジャンル"
+      type: categorical
+      required: true
+
+    release_date:
+      labels:
+        - "Release Date"
+        - "Launch Date"
+        - "ရက်စွဲ"
+        - "Date de sortie"
+      type: date
+      format: yyyy-mm-dd
+      required: false
+
+    modes:
+      labels:
+        - "Game Modes"
+        - "Modes"
+        - "Single-player / Multiplayer"
+        - "Spielmodi"
+      type: list
+      required: false
