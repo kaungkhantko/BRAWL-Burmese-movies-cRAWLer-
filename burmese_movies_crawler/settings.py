@@ -18,7 +18,6 @@ NEWSPIDER_MODULE = "burmese_movies_crawler.spiders"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
-DOWNLOAD_DELAY = 1  # be respectful
 FEED_FORMAT = "json"
 FEED_URI = "output/movies.json"
 now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -32,7 +31,7 @@ LOG_LEVEL = "INFO"
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-#DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = 3
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
