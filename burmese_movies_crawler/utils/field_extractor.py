@@ -5,12 +5,13 @@ from burmese_movies_crawler.items import FIELD_SELECTORS
 from fuzzywuzzy import process
 import logging
 from burmese_movies_crawler.items import BurmeseMoviesItem
+from urllib.parse import urldefrag
 
 logger = logging.getLogger(__name__)
 class FieldExtractor:
     def __init__(self, invalid_links=None):
         self.invalid_links = invalid_links if invalid_links is not None else []
-        self.items_scraped = items_scraped
+        self.items_scraped = 0
 
         self.CATALOGUE_FIELD_MAPPING = {
             'title': ['h1.entry-title::text', 'h1.title::text', 'div.movie-title::text'],
@@ -40,7 +41,7 @@ class FieldExtractor:
         selectors = [
             'div.item a::attr(href)', 'div.card a::attr(href)', 'div.movie a::attr(href)',
             'div.movie-entry a::attr(href)', 'div.movie-card a::attr(href)',
-            'article a::attr(href)', 'li a::attr(href)'
+            'article a::attr(href)', 'li a::attr(href)', 'a::attr(href)'
         ]
         links = []
         for selector in selectors:
@@ -48,13 +49,16 @@ class FieldExtractor:
 
         unique_links = set()
         for link in links:
-            if is_valid_link(link, self.invalid_links):
-                unique_links.add(link.strip())
+            if not link or not isinstance(link, str):
+                continue
+            stripped_link = urldefrag(link.strip())[0]  # Remove any #fragment
+            if is_valid_link(stripped_link, self.invalid_links):
+                unique_links.add(stripped_link)
 
         logger.info(f"Extracted {len(unique_links)} valid links after filtering.")
         return list(unique_links)
     
-    def _extract_first(self, response, selectors):
+    def extract_first(self, response, selectors):
         for sel in selectors:
             value = response.css(sel).get()
             if value:
@@ -68,7 +72,7 @@ class FieldExtractor:
             'poster_url': ['div.entry-content img::attr(src)'],
             'streaming_link': ['iframe::attr(src)']
         }
-        return {field: self._extract_first(response, selectors) for field, selectors in fields.items()}
+        return {field: self.extract_first(response, selectors) for field, selectors in fields.items()}
     def extract_paragraphs(self, response):
         data, used = {}, set()
         for text in response.css('div.entry-content p::text').getall():
@@ -94,3 +98,29 @@ class FieldExtractor:
             if item.get('title'):
                 yield item
                 self.items_scraped += 1
+
+    def _map_headers(self, headers):
+        mapping = {
+            'title': ['title', 'film title', 'film', 'movie'],
+            'year': ['year', 'release year', 'film year'],
+            'director': ['director', 'directed by', 'filmmaker'],
+            'genre': ['genre', 'type', 'category']
+        }
+        results = {}
+        for head in headers:
+            for field, candidates in mapping.items():
+                match, score = process.extractOne(head.lower(), candidates)
+                if score > 70:
+                    results[head] = field
+        return results
+
+    def _match_field(self, text):
+        best, score = None, 0
+        for field, candidates in self.MOVIE_DETAIL_FIELD_MAPPING.items():
+            match, match_score = process.extractOne(text.lower(), candidates)
+            if match_score > score:
+                best, score = field, match_score
+        return best, score
+
+    def _clean_text(self, text):
+        return text.split(':', 1)[-1].strip() if ':' in text else text

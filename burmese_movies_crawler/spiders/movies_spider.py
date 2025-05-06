@@ -188,29 +188,3 @@ class MoviesSpider(scrapy.Spider):
 
         return results
 
-    def _map_headers(self, headers):
-        mapping = {
-            'title': ['title', 'film title', 'film', 'movie'],
-            'year': ['year', 'release year', 'film year'],
-            'director': ['director', 'directed by', 'filmmaker'],
-            'genre': ['genre', 'type', 'category']
-        }
-        results = {}
-        for head in headers:
-            for field, candidates in mapping.items():
-                match, score = process.extractOne(head.lower(), candidates)
-                if score > 70:
-                    results[head] = field
-        return results
-
-    def _match_field(self, text):
-        best, score = None, 0
-        for field, candidates in self.MOVIE_DETAIL_FIELD_MAPPING.items():
-            match, match_score = process.extractOne(text.lower(), candidates)
-            if match_score > score:
-                best, score = field, match_score
-        return best, score
-
-    def _clean_text(self, text):
-        return text.split(':', 1)[-1].strip() if ':' in text else text
-
