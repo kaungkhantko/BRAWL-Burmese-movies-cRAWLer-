@@ -1,3 +1,5 @@
+# # burmese_movies_crawler/utils/link_utils.py
+
 from urllib.parse import urlparse
 import logging
 from scrapy.http import HtmlResponse
@@ -55,6 +57,7 @@ def is_valid_link(url, invalid_links_log=None):
     return True
 
 def extract_page_stats(response):
+    """Count basic elements on the page for classification."""
     return {
         'links': len(response.xpath('//a')),
         'images': len(response.xpath('//img')),
@@ -64,6 +67,7 @@ def extract_page_stats(response):
     }
 
 def rule_detail_like(stats):
+    """Negative rule: pages with iframes but very few links look like detail pages."""
     return not (stats['iframes'] >= 1 and stats['links'] < 30)
 
 def rule_link_heavy(stats, thresholds):
@@ -85,6 +89,11 @@ def rule_fallback_links(stats, thresholds):
            stats['images'] <= thresholds['fallback_max_images']
 
 def evaluate_catalogue_rules(response, stats, rules, thresholds):
+    """
+    Run each rule function and collect (name, passed, weight).
+    `rules` is a list of (name, fn, weight) where fn takes either
+    (stats, thresholds) or (response, stats, thresholds) for table rules.
+    """
     results = []
     for name, rule_fn, weight in rules:
         try:
@@ -96,6 +105,10 @@ def evaluate_catalogue_rules(response, stats, rules, thresholds):
     return results
 
 def compute_catalogue_score(rule_results, method="sum"):
+    """
+    Combine rule_results into a single score or boolean.
+    rule_results: [{'name':..., 'passed':bool, 'weight':int}, ...]
+    """
     if method == "sum":
         return sum(r['weight'] for r in rule_results if r['passed'])
     elif method == "weighted_average":
@@ -105,32 +118,3 @@ def compute_catalogue_score(rule_results, method="sum"):
     elif method == "strict_majority":
         return sum(r['passed'] for r in rule_results) > len(rule_results) / 2
     return sum(r['weight'] for r in rule_results if r['passed'])
-
-def is_catalogue_page(self, response):
-    stats = {
-        'links': len(response.xpath('//a')),
-        'images': len(response.xpath('//img')),
-        'iframes': len(response.xpath('//iframe')),
-        'paragraphs': len(response.xpath('//p')),
-        'tables': len(response.xpath('//table'))
-    }
-    logger.info(f"[Page stats] {stats}")
-
-    if not self._rule_detail_like(stats):
-        logger.info("Page likely a DETAIL page.")
-        return False
-
-    rule_results = self.evaluate_catalogue_rules(response, stats)
-
-    score = self.compute_catalogue_score(rule_results, method=self.DEFAULT_RULE_THRESHOLDS.get('scoring_method', 'sum'))
-
-    if isinstance(score, bool):
-        return score  # For strict_majority style
-
-    threshold = self.DEFAULT_RULE_THRESHOLDS.get('score_threshold', 3)
-    logger.info(f"[Catalogue Score] {score} (Threshold={threshold})")
-
-    return score >= threshold
-
-def is_detail_page(response):
-    return bool(response.css('h1.entry-title, h1.title, div.movie-title').get())
