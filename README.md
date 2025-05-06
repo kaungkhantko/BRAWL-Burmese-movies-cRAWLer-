@@ -6,42 +6,30 @@ Built with [Scrapy](https://scrapy.org/), [Selenium](https://www.selenium.dev/),
 
 ---
 
-## Project Purpose
+## 🧠 Project Vision
 
-This project was created as a **hobby learning initiative** to practice real-world **data engineering** and **software engineering** concepts.
+Originally launched as a **learning project**, this crawler has grown into a modular framework aimed at:
+- Cataloguing Burmese cinema across fragmented, low-structure sources
+- Powering a searchable frontend with built-in analytics
+- Scaling into a metadata aggregator for other domains (e.g., video games)
 
-Key learning goals include:
-- Building scalable crawlers with dynamic page classification
-- Managing structured data pipelines (JSON, logs, summaries)
-- Integrating AI assistance for semi-structured content extraction
-- Improving robustness, error handling, and crawl orchestration
-- Learning how to ship maintainable scraping frameworks, not just one-off scripts
+See [`docs/architecture.md`](docs/architecture.md) for an in-depth breakdown of components and design decisions.
 
 ---
 
-## Features
+## ⚙️ Features
 
-- **Catalogue and Detail Classification**  
-  Dynamically distinguishes between catalogue pages and individual movie pages during crawl.
-
-- **Dynamic Link Extraction**  
-  Prioritizes and weights selectors intelligently to extract links, even from irregular page structures.
-
-- **Auto-Fallback via OpenAI**  
-  If no clear HTML structure is detected, the crawler uses OpenAI GPT to choose the best movie block.
-
-- **Paginated Crawling**  
-  Automatically follows "next page" links across catalogue listings.
-
-- **Full Run Summaries**  
-  After every crawl, detailed metadata including runtime, items scraped, warnings, and errors are saved.
-
-- **Organized Output**  
-  All outputs (movie data, logs, and run summaries) are timestamped and saved neatly inside `output/{timestamp}/`.
+- **Dynamic Page Classification**: Automatically detects catalogue vs detail pages using rule-based scoring.
+- **Link Filtering + Retry Logic**: Skips invalid links (`javascript:`, fragments, etc.) and retries failed requests.
+- **Fuzzy Extraction**: Extracts movie data using fuzzy logic and universal selectors — no site-specific hardcoding.
+- **OpenAI Fallbacks**: GPT-powered selection helps extract ambiguous or semi-structured blocks.
+- **Paginated Crawling**: Follows next-page links when available.
+- **Field Provenance**: Tracks where each piece of data was extracted from.
+- **Timestamped Output**: Organized crawl outputs (`JSON`, `log`, `summary`) in per-run folders.
 
 ---
 
-## Installation
+## 🚀 Installation
 
 ```bash
 git clone https://github.com/yourusername/burmese-movies-crawler.git
@@ -49,66 +37,55 @@ cd burmese-movies-crawler
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-You must also have **Google Chrome** and **chromedriver** installed and available in your PATH.
+````
 
 ---
 
-## Usage
-
-First, activate your virtual environment:
+## 🕹 Usage
 
 ```bash
 source .venv/bin/activate
-```
-
-Then, start the crawler:
-
-```bash
 python run_spider.py
 ```
 
-Upon running, the crawler will:
+The crawler will:
 
-- Launch the Scrapy spider and Selenium headless browser
-- Classify pages (catalogue or detail) dynamically
-- Follow pagination links if available
-- Save all outputs neatly into a timestamped folder (e.g., `output/2025-04-28_11-15-28/`), including:
-  - `movies_{timestamp}.json` — structured movie metadata
-  - `crawler_output_{timestamp}.log` — full crawl logs
-  - `run_summary_{timestamp}.json` — summary stats of the crawl (items scraped, runtime, errors, etc.)
+* Classify page types
+* Extract and follow valid links
+* Scrape and enrich movie fields
+* Save all outputs to `output/{timestamp}/`
 
----
+Output includes:
 
-## Technologies Used
-
-- Python 3.13
-- Scrapy
-- Selenium
-- OpenAI API
-- LXML, Parsel, HTTPX
+* `movies_*.json`: structured data
+* `run_summary_*.json`: runtime stats
+* `crawler_output_*.log`: logging output
+* `invalid_links_*.json`: skipped URLs with reasons
 
 ---
 
-## Lessons Learned
+## 💡 Lessons Learnt
 
-- **Web pages are messy**: Expect unpredictable HTML structures, broken links, missing data, and anti-bot measures.
-- **Scrapy is extremely powerful**: But mastering its async nature, middlewares, and settings requires real-world practice.
-- **Crawling ≠ Scraping**: Good crawlers focus heavily on *classification*, *navigation*, *retry logic*, not just pulling data.
-- **Error handling matters**: Small crashes compound in crawlers. Proper try/except handling + warnings tracking = essential.
-- **OpenAI integration is practical**: GPT models can assist in ambiguous scraping tasks (e.g., picking the right content block).
-- **Run Summaries are underrated**: Generating a `run_summary.json` helps in diagnosing crawl quality without inspecting raw output manually.
-- **Project structure matters**: Keeping `items.py`, `middlewares.py`, `settings.py`, and `spiders/` clean makes scaling easier later.
-- **Virtual environments protect you**: Avoid polluting system Python. Treat `.venv` management seriously.
-- **Scrapy + Selenium hybrid setups**: Allow flexible rendering, but come at a resource cost — balance headless browsing carefully.
-- **Don't just scrape — engineer pipelines**: Treat crawled data as if you'll be shipping it into a database, ML system, or public API.
+* Writing resilient crawlers, not just scrapers
+* Handling malformed, inconsistent HTML at scale
+* Modularizing extraction logic for reuse
+* Using OpenAI to augment crawling
+* Designing data pipelines with summary/logging layers
+* Building towards analytics-ready, source-aware datasets
 
 ---
 
-## License
+## 📘 Further Reading
 
-This project is licensed under the MIT License.  
-Feel free to use, modify, and distribute — attribution appreciated but not required.
+* [docs/architecture.md](docs/architecture.md): Internal structure, data flow, planned extensions
+* `tests/`: Growing test suite for validation and classification logic
 
 ---
+
+## 📝 License
+
+MIT — free to use, remix, or build upon.
+
+---
+
+> Built solo as an educational, ethical, and technical exploration of how to preserve and promote Burmese film metadata at scale.
