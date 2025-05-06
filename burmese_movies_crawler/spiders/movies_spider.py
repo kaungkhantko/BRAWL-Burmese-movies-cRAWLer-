@@ -12,6 +12,8 @@ from scrapy import signals
 from burmese_movies_crawler.items import BurmeseMoviesItem, FIELD_SELECTORS
 from burmese_movies_crawler.candidate_extractor import extract_candidate_blocks
 from burmese_movies_crawler.openai_selector import query_openai_for_best_selector
+from urllib.parse import urlparse
+from burmese_movies_crawler.utils.link_utils import is_valid_link
 
 logger = logging.getLogger(__name__)
 
@@ -155,32 +157,6 @@ class MoviesSpider(scrapy.Spider):
         fake_response = HtmlResponse(url=response.url, body=best_block_html, encoding='utf-8')
         yield from self.parse_detail(fake_response)
 
-    def is_catalogue_page(self, response):
-        stats = {
-            'links': len(response.xpath('//a')),
-            'images': len(response.xpath('//img')),
-            'iframes': len(response.xpath('//iframe')),
-            'paragraphs': len(response.xpath('//p')),
-            'tables': len(response.xpath('//table'))
-        }
-        logger.info(f"[Page stats] {stats}")
-
-        if not self._rule_detail_like(stats):
-            logger.info("Page likely a DETAIL page.")
-            return False
-
-        rule_results = self.evaluate_catalogue_rules(response, stats)
-
-        score = self.compute_catalogue_score(rule_results, method=self.DEFAULT_RULE_THRESHOLDS.get('scoring_method', 'sum'))
-
-        if isinstance(score, bool):
-            return score  # For strict_majority style
-
-        threshold = self.DEFAULT_RULE_THRESHOLDS.get('score_threshold', 3)
-        logger.info(f"[Catalogue Score] {score} (Threshold={threshold})")
-
-        return score >= threshold
-
     def evaluate_catalogue_rules(self, response, stats):
         """Evaluate all rules and collect their boolean outcomes."""
         results = []
@@ -207,72 +183,6 @@ class MoviesSpider(scrapy.Spider):
 
         return results
 
-    def compute_catalogue_score(self, rule_results, method="sum"):
-        """Compute catalogue confidence score based on chosen method."""
-
-        if method == "sum":
-            total = sum(r['weight'] for r in rule_results if r['passed'])
-            logger.info(f"[Scoring] SUM method score = {total}")
-            return total
-
-        elif method == "weighted_average":
-            max_possible = sum(r['weight'] for r in rule_results)
-            achieved = sum(r['weight'] for r in rule_results if r['passed'])
-            score = (achieved / max_possible) * 100 if max_possible > 0 else 0
-            logger.info(f"[Scoring] WEIGHTED AVERAGE method score = {score:.2f}")
-            return score
-
-        elif method == "strict_majority":
-            passes = sum(1 for r in rule_results if r['passed'])
-            majority = passes >= (len(rule_results) / 2)
-            logger.info(f"[Scoring] STRICT MAJORITY method = {majority}")
-            return majority
-
-        else:
-            logger.warning(f"[Scoring] Unknown method '{method}'. Defaulting to SUM.")
-            return sum(r['weight'] for r in rule_results if r['passed'])
-
-    def _extract_page_stats(self, response):
-        """Extract basic counts from a page."""
-        return {
-            'links': len(response.xpath('//a')),
-            'images': len(response.xpath('//img')),
-            'iframes': len(response.xpath('//iframe')),
-            'paragraphs': len(response.xpath('//p')),
-            'tables': len(response.xpath('//table')),
-        }
-    
-    def _rule_detail_like(self, stats):
-        """Negative rule: if iframes exist and few links."""
-        return not (stats['iframes'] >= 1 and stats['links'] < 30)
-
-    def _rule_link_heavy(self, stats):
-        """Positive rule: many links, no iframes."""
-        return stats['links'] > self.DEFAULT_RULE_THRESHOLDS['link_heavy_min_links'] and \
-            stats['iframes'] <= self.DEFAULT_RULE_THRESHOLDS['link_heavy_max_iframes']
-
-    def _rule_text_heavy(self, stats):
-        """Positive rule: lots of paragraphs, few images."""
-        return stats['paragraphs'] > self.DEFAULT_RULE_THRESHOLDS['text_heavy_min_paragraphs'] and \
-            stats['images'] <= self.DEFAULT_RULE_THRESHOLDS['text_heavy_max_images']
-
-    def _rule_table_catalogue(self, response, stats):
-        """Positive rule: static table structure detected."""
-        if stats['tables'] >= 1:
-            rows = response.css('table tbody tr')
-            if len(rows) >= self.DEFAULT_RULE_THRESHOLDS['table_min_rows']:
-                logger.info("Detected TABLE catalogue with multiple rows.")
-                return True
-        return False
-
-    def _rule_fallback_links(self, stats):
-        """Positive rule: fallback moderate link-heavy."""
-        return stats['links'] > self.DEFAULT_RULE_THRESHOLDS['fallback_min_links'] and \
-            stats['images'] <= self.DEFAULT_RULE_THRESHOLDS['fallback_max_images']
-
-    def is_detail_page(self, response):
-        return bool(response.css('h1.entry-title, h1.title, div.movie-title').get())
-
     def extract_links(self, response):
         selectors = [
             'div.item a::attr(href)', 'div.card a::attr(href)', 'div.movie a::attr(href)',
@@ -285,8 +195,8 @@ class MoviesSpider(scrapy.Spider):
 
         unique_links = set()
         for link in links:
-            if self.is_valid_link(link) and (link.startswith('/') or link.startswith('http')):
-                unique_links.add(link)
+            if is_valid_link(link, self.invalid_links):
+                unique_links.add(link.strip())
 
         logger.info(f"Extracted {len(unique_links)} valid links after filtering.")
         return list(unique_links)
@@ -358,19 +268,4 @@ class MoviesSpider(scrapy.Spider):
 
     def _clean_text(self, text):
         return text.split(':', 1)[-1].strip() if ':' in text else text
-
-    def is_valid_link(self, url):
-        if not url:
-            self.invalid_links.append(("Empty URL", url))
-            return False
-        if url.startswith('javascript:'):
-            self.invalid_links.append(("Javascript link", url))
-            return False
-        if url.startswith('#'):
-            self.invalid_links.append(("Fragment link", url))
-            return False
-        if url.lower().strip() in ['void(0)', 'none', '']:
-            self.invalid_links.append(("Placeholder text", url))
-            return False
-        return True
 
