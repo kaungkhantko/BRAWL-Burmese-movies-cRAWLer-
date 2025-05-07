@@ -7,8 +7,11 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 import datetime
-BOT_NAME = "burmese_movies_crawler"
+import os
 
+MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
+
+BOT_NAME = "burmese_movies_crawler"
 SPIDER_MODULES = ["burmese_movies_crawler.spiders"]
 NEWSPIDER_MODULE = "burmese_movies_crawler.spiders"
 

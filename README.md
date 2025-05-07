@@ -13,7 +13,7 @@ Originally launched as a **learning project**, this crawler has grown into a mod
 - Powering a searchable frontend with built-in analytics
 - Scaling into a metadata aggregator for other domains (e.g., video games)
 
-See [`docs/architecture.md`](docs/architecture.md) for an in-depth breakdown of components and design decisions.
+See [`docs/documentation.md`](docs/documentation.md) for an in-depth breakdown of components and design decisions.
 
 ---
 

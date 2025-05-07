@@ -18,6 +18,8 @@ from burmese_movies_crawler.utils.selenium_manager import SeleniumManager
 from burmese_movies_crawler.utils.page_classifier import PageClassifier
 from burmese_movies_crawler.utils.field_extractor import FieldExtractor
 from burmese_movies_crawler.utils.orchestrator import handle_page
+from burmese_movies_crawler.utils.link_utils import get_response_or_request
+from burmese_movies_crawler.settings import MOCK_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,11 @@ class MoviesSpider(scrapy.Spider):
         "https://www.imdb.com/search/title/?country_of_origin=MM",
         "https://www.savemyanmarfilm.org/film-catalogue/"
     ]
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield get_response_or_request(url, self.parse)
+
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -82,10 +89,11 @@ class MoviesSpider(scrapy.Spider):
 
     def open_spider(self, spider):
         # start up Selenium via our manager
-        self.selenium_mgr = SeleniumManager()
-        self.driver = self.selenium_mgr.__enter__()
-        self.start_time = datetime.now(timezone.utc)
-        logger.info("Chrome Driver started.")
+        if not MOCK_MODE:
+            self.selenium_mgr = SeleniumManager()
+            self.driver = self.selenium_mgr.__enter__()
+            self.start_time = datetime.now(timezone.utc)
+            logger.info("Chrome Driver started.")
 
     def close_spider(self, spider, reason):
         # tear down Selenium

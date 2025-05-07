@@ -3,7 +3,8 @@
 from urllib.parse import urlparse
 import logging
 from scrapy.http import HtmlResponse
-
+import hashlib
+from burmese_movies_crawler.settings import MOCK_MODE
 logger = logging.getLogger(__name__)
 
 def is_valid_link(url, invalid_links_log=None):
@@ -118,3 +119,19 @@ def compute_catalogue_score(rule_results, method="sum"):
     elif method == "strict_majority":
         return sum(r['passed'] for r in rule_results) > len(rule_results) / 2
     return sum(r['weight'] for r in rule_results if r['passed'])
+
+def get_response_or_request(url: str, callback):
+    if MOCK_MODE:
+        # Safe hash-based naming (MD5)
+        hashname = hashlib.md5(url.encode()).hexdigest()
+        fixture_path = os.path.join("tests", "fixtures", f"{hashname}.html")
+
+        if not os.path.exists(fixture_path):
+            raise FileNotFoundError(f"[MOCK_MODE] Fixture not found for {url} ({fixture_path})")
+
+        with open(fixture_path, encoding="utf-8") as f:
+            html = f.read()
+
+        return HtmlResponse(url=f"mock://{hashname}", body=html, encoding="utf-8")
+    else:
+        return scrapy.Request(url=url, callback=callback)

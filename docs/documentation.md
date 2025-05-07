@@ -138,6 +138,43 @@ To ensure consistent and high-quality data throughout the scraping pipeline, the
 
 ---
 
+## Running in Mock Mode (Offline Testing)
+
+You can run the crawler entirely offline using local HTML files by enabling Mock Mode. This is useful for:
+
+* Fast, deterministic testing without hitting live sites
+* Iterating on parsing logic using saved fixtures
+* Avoiding network/Selenium dependencies in CI environments
+
+### How to Run
+
+```bash
+MOCK_MODE=true python run_spider.py
+```
+
+This will:
+
+* Skip all live requests and Selenium usage
+* Load pre-saved HTML from `tests/fixtures/` based on the hashed URL
+* Output results normally to the `/output/` directory
+
+### Fixture File Naming
+
+Each fixture file must be named using the MD5 hash of the target URL. For example:
+
+```python
+import hashlib
+print(hashlib.md5("https://example.com".encode()).hexdigest())
+```
+
+Save the raw HTML as:
+
+```text
+tests/fixtures/<md5_hash>.html
+```
+
+---
+
 ## Future Enhancements
 
 * [ ] Parallelized crawl orchestration
