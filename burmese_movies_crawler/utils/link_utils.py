@@ -6,6 +6,8 @@ from scrapy.http import HtmlResponse
 import hashlib
 from burmese_movies_crawler.settings import MOCK_MODE
 logger = logging.getLogger(__name__)
+import scrapy
+import os
 
 def is_valid_link(url, invalid_links_log=None):
     """
