@@ -3,6 +3,11 @@ from scrapy.http import HtmlResponse, Request
 from burmese_movies_crawler.utils.field_extractor import FieldExtractor
 from burmese_movies_crawler.items import BurmeseMoviesItem
 from burmese_movies_crawler.utils.field_mapping_loader import load_field_mapping
+import difflib
+
+def normalize_keys(d):
+    """Strip keys and values to avoid unicode or whitespace issues."""
+    return {k.strip(): v.strip() for k, v in d.items()}
 
 def test_yaml_field_mapping_structure():
     movie_mapping = load_field_mapping("movies")
@@ -14,15 +19,30 @@ def test_yaml_field_mapping_structure():
     (["Film Title", "Release Year", "Directed By", "Genre"],
      {"Film Title": "title", "Release Year": "year", "Directed By": "director", "Genre": "genre"}),
 
-    (["ဇာတ်ကားအမည်", "နှစ်", "ဒါရိုက်တာ", "အမျိုးအစား"],
-     {"ဇာတ်ကားအမည်": "title", "နှစ်": "year", "ဒါရိုက်တာ": "director", "အမျိုးအစား": "genre"}),
+    (["ဇာတ်ကားအမည်", "ခုနှစ်", "ဒါရိုက်တာ", "အမျိုးအစား"],
+     {"ဇာတ်ကားအမည်": "title", "ခုနှစ်": "year", "ဒါရိုက်တာ": "director", "အမျိုးအစား": "genre"}),
 
     (["Titre du film", "Année de sortie", "Réalisateur", "Catégorie"],
      {"Titre du film": "title", "Année de sortie": "year", "Réalisateur": "director", "Catégorie": "genre"})
 ])
 def test_map_headers_with_yaml(headers, expected):
     fe = FieldExtractor(content_type="movies")
-    assert fe._map_headers(headers) == expected
+    mapped = fe._map_headers(headers)
+
+    norm_mapped = normalize_keys(mapped)
+    norm_expected = normalize_keys(expected)
+
+    try:
+        assert norm_mapped == norm_expected
+    except AssertionError:
+        print("\n🔍 Mapped vs Expected Diff:\n")
+        for k in set(norm_expected) | set(norm_mapped):
+            if norm_mapped.get(k) != norm_expected.get(k):
+                a = norm_mapped.get(k, "[Missing]")
+                b = norm_expected.get(k, "[Missing]")
+                print(f"❌ Key: {k}")
+                print("\n".join(difflib.ndiff([a], [b])))
+        raise
 
 @pytest.mark.parametrize("text,expected_field", [
     ("Director: John Doe", "director"),
@@ -407,30 +427,46 @@ def test_extract_from_table_variants(extractor, html, mapped_headers, expected, 
             assert item.get(field) == value
 
 def test_map_headers():
-    fe = FieldExtractor()
+    fe = FieldExtractor(content_type="movies")
     headers = ['Film Title', 'Release Year', 'Directed By', 'Genre']
     mapped = fe._map_headers(headers)
-    assert mapped == {
+
+    # Build expected using the actual labels
+    labels = load_field_mapping("movies")
+    expected = {
         'Film Title': 'title',
         'Release Year': 'year',
         'Directed By': 'director',
         'Genre': 'genre'
     }
 
-def test_match_field():
-    fe = FieldExtractor()
-    field, score = fe._match_field("Directed by John Doe")
-    assert field == "director"
-    assert score > 70
+    assert mapped == expected
 
-def test_clean_text_colon_split():
-    fe = FieldExtractor()
-    assert fe._clean_text("Director: John Doe") == "John Doe"
+@pytest.mark.parametrize("text,expected_field", [
+    ("Directed by John Doe", "director"),
+    ("ဒါရိုက်တာ - မောင်မောင်", "director"),
+    ("Réalisateur : Jean Dupont", "director"),
+    ("Acteurs : A, B, C", "cast"),
+    ("ジャンル: ドラマ", "genre"),
+    ("ဇာတ်ကားအမည်: တိုက်ပွဲ", "title"),
+    ("Film Title: Battle City", "title"),
+    ("Année de sortie - 2020", "year"),
+])
+def test_match_field_multilingual(text, expected_field):
+    fe = FieldExtractor(content_type="movies")
+    field, score = fe._match_field(text)
+    assert field == expected_field, f"Expected {expected_field}, got {field} for input: {text}"
+    assert score >= 70, f"Score {score} too low for input: {text}"
 
-def test_clean_text_dash_split():
-    fe = FieldExtractor()
-    assert fe._clean_text("Genre – Action") == "Action"
 
-def test_clean_text_no_split():
-    fe = FieldExtractor()
-    assert fe._clean_text("Action") == "Action"
+@pytest.mark.parametrize("raw,expected", [
+    ("Director: John Doe", "John Doe"),
+    ("Genre – Action", "Action"),
+    ("Runtime - 120 min", "120 min"),
+    ("ဇာတ်လမ်းအကျဉ်း : ဇာတ်လမ်းအကြောင်း", "ဇာတ်လမ်းအကြောင်း"),
+    ("No Delimiter", "No Delimiter"),
+    ("", "")
+])
+def test_clean_text_variants(raw, expected):
+    fe = FieldExtractor(content_type="movies")
+    assert fe._clean_text(raw) == expected

@@ -18,6 +18,7 @@ content_types:
         - "Year"
         - "Release Year"
         - "နှစ်"
+        - "ခုနှစ်"
         - "Année de sortie"
         - "年"
       type: integer
@@ -50,6 +51,7 @@ content_types:
         - "Running Time"
         - "Runtime"
         - "ချိန်အကြာ"
+        - "ကြာချိန်"
         - "Durée"
       type: string
       required: false
@@ -60,6 +62,7 @@ content_types:
         - "Actors"
         - "Starring"
         - "အဖြစ်ဆောင်"
+        - "သရုပ်ဆောင်"
         - "Acteurs"
       type: list
       required: false
@@ -92,6 +95,7 @@ content_types:
         - "发行商"
         - "Éditeur"
         - "Publisher Name"
+        - "ထုတ်ဝေသူ"
       type: string
       required: false
 
