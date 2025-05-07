@@ -84,6 +84,60 @@ It is designed to evolve into a broader **metadata aggregation and analytics sys
 
 ---
 
+## 📐 Data Validation
+
+To ensure consistent and high-quality data throughout the scraping pipeline, the project uses **Pydantic-based validation** before any item is persisted or exported.
+
+## ✅ Implementation
+
+* The schema is defined in [`burmese_movies_crawler/schema/item_schema.py`](../burmese_movies_crawler/schema/item_schema.py).
+* Validation is performed in the item pipeline (`BurmeseMoviesPipeline`) using the Pydantic `MovieItem` model.
+* Invalid items are automatically dropped and logged with a warning message.
+* The `MovieItem` schema enforces:
+
+  * Non-empty `title` and `director` fields
+  * Reasonable `year` bounds (1900–2100)
+  * Optional `cast` field that supports both comma-separated strings and cleaned lists
+  * Auto-stripping of whitespace in strings and list elements
+  * Rejection of overly long `synopsis` entries (max 1000 characters)
+  * Validation of proper URL formats for `poster_url` and `streaming_link`
+
+### 🧪 Testing
+
+* Validation logic is tested under `tests/unit/test_item_schema.py` using `pytest`.
+* Edge cases are included, such as:
+
+  * Empty or whitespace-only fields
+  * Malformed URLs
+  * Unexpected formats in `cast` and `synopsis`
+
+---
+
+### Validation FLow
+
+
+🕷️  Crawl (Scrapy Spider)
+      |
+      v
+🧱  Parse HTML Content
+      |
+      v
+📦  Build Scrapy Item (BurmeseMoviesItem)
+      |
+      v
+✅  Pydantic Validation (MovieItem Schema)
+    ├─ Valid → Pass to Pipeline
+    └─ Invalid → Drop & Log Warning
+      |
+      v
+🧹  Transform / Normalize (optional enrichments)
+      |
+      v
+📝  Store in JSON / Database / Export Format
+
+
+---
+
 ## Future Enhancements
 
 * [ ] Parallelized crawl orchestration
