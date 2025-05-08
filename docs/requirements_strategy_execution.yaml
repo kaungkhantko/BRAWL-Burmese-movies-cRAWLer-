@@ -1,0 +1,250 @@
+# === BRAWL Web Crawler – Business Requirements & Execution Map ===
+# This file captures the project’s functional goals, data constraints, operational expectations,
+# strategic alignment, acceptance criteria, and KPIs.
+
+project_metadata:
+  project_name: Burmese Movies Catalogue
+  version: 1.1
+  owner: Kaung Khant Ko
+  last_updated: [2025-05-08]
+
+purpose_and_goals:
+  mission: >-
+    To create a comprehensive and searchable catalogue of Burmese films, 
+    including feature films, TV series, and documentaries, to support research 
+    and promote the Burmese film industry.
+  primary_users:
+    - General public
+    - Researchers / scholars
+    - Internal analytics
+  intended_outcomes:
+    - Searchable catalogue of Burmese-related films
+    - Dataset export for research
+    - API integration (planned, with editorial tooling)
+    - Human validation and enrichment pipeline
+
+content_scope:
+  media_types:
+    include:
+      - Feature films
+      - TV series
+      - Documentaries
+      - Short films
+    exclude:
+      - User-generated content (YouTube clips, TikTok, etc.)
+  inclusion_criteria:
+    language: ["Burmese", "Zawgyi", "Unicode mixed"]
+    country_origin: ["Myanmar", "Co-productions", "International"]
+    cast_or_director_nationality: true
+  required_fields:
+    - title
+  optional_fields:
+    - year
+    - director
+    - cast
+    - synopsis
+    - genre
+    - poster_url
+    - awards
+    - reviews
+    - production_company
+    - runtime
+    - language
+    - subtitles
+    - country
+    - related_links
+  notes:
+    - Records with only a title are allowed but must be marked for future enrichment
+    - Field-level provenance is required for each populated value
+
+source_strategy:
+  discovery:
+    curated_sources: true
+    auto_discovery: true
+    initial_sources:
+      - IMDb
+      - TMDb
+      - Wikipedia
+      - Burmese film databases
+      - Wathan Film Festival
+      - Asian Film Archive
+  source_types:
+    - News portals
+    - Streaming sites
+    - Wikipedia-style directories
+    - Blogspot & WordPress pages
+    - Social media (Facebook, Instagram)
+    - Film Festivals
+    - Awards sites
+    - Film industry associations
+  multilingual_support: true
+  unicode_handling: true
+
+crawl_strategy:
+  refresh_interval: weekly
+  max_pages_per_domain: 500
+  expected_scale: 50,000+ pages over time
+  dynamic_content_support:
+    js_rendering: true
+    rendering_pool_size: 4
+    domain_specific_rendering: true
+  link_following_policy: unrestricted_within_domain
+  mock_mode_for_testing: true
+  deduplication: true
+  crawl_resume_support: true
+  data_merging_across_sources: true
+
+data_validation:
+  accuracy_over_coverage: true
+  allow_partial_entries: true
+  provenance_required: true
+  provenance_granularity: per_field
+  human_review_loop: true
+  enrichment_pipeline:
+    - retry_queue_for_failures: true
+    - editor_interface_support: true
+
+compliance:
+  robots_txt_respected: true
+  site_exemptions_allowed: false
+  copyright_safe_posters_only: true
+  user_agent_header: "BRAWL-Crawler (+contact_url)"
+
+extensibility:
+  future_expansion:
+    - Games and game metadata
+    - Tech stack analysis
+    - Cross-referencing IMDb/TMDb
+  downstream_features:
+    - Search frontend
+    - Recommendation engine
+    - Trend dashboard
+  schema_design:
+    field_sets: modular_per_content_type
+
+deployment:
+  environment:
+    - dev: localhost with mock mode
+    - prod: cloud server or VPS
+  orchestration:
+    - cron-based or scheduled job
+    - possible future: Kubernetes batch jobs
+  api_strategy:
+    mode: backend_first_with_lightweight_api_layer
+    backend: supports future OpenAPI definition
+    editing_interface: planned for external enrichment
+
+strategy_execution_map:
+  - strategy: Research-first accuracy
+    implication: Focus on canonical data (e.g., awards, verified credits)
+    implementation: Use authoritative sources; enable human validation loop
+    acceptance_criteria:
+      - Collect data from trusted sources (IMDb, TMDb, Wikipedia)
+      - Field-level provenance must be present
+      - Editorial review exists for high-value fields (title, director, awards)
+    kpis:
+      - metadata_certified_rate: "% of entries with award/certified data"
+      - editorial_review_coverage: "% of high-confidence entries reviewed"
+
+  - strategy: Breadth over depth
+    implication: Crawl more films, even with minimal metadata
+    implementation: Accept sparse entries and flag for enrichment
+    acceptance_criteria:
+      - Accept entries with only a title
+      - Flag incomplete entries for enrichment pipeline
+    kpis:
+      - weekly_title_only_additions: "# of title-only entries/week"
+      - enrichment_uplift_rate: "% of partial entries upgraded monthly"
+
+  - strategy: Provenance per field
+    implication: Store origin for each metadata field independently
+    implementation: Include source tag alongside each field in DB/JSON
+    acceptance_criteria:
+      - Field-level provenance shown in exports and editorial UI
+    kpis:
+      - provenance_tag_coverage: "% of fields with valid source tags"
+      - avg_sources_per_film: "Average unique sources per film"
+
+  - strategy: Free link-following within domain
+    implication: Flexible, deep crawling of sites
+    implementation: Allow all internal links unless explicitly blacklisted
+    acceptance_criteria:
+      - Crawler respects domain boundary but explores freely inside
+    kpis:
+      - domain_crawl_success_rate: "% of pages fetched successfully"
+      - crawl_depth_median: "Median link depth"
+
+  - strategy: Domain-specific JS rendering
+    implication: Conserve compute; only render when needed
+    implementation: Use Selenium selectively via domain allowlist
+    acceptance_criteria:
+      - Rendering turned on only for specific domains
+    kpis:
+      - selenium_render_ratio: "% of pages requiring JS rendering"
+      - avg_render_time: "Seconds per JS-rendered page"
+
+  - strategy: Merge data across sources
+    implication: Single record per film with unified metadata
+    implementation: Use fuzzy logic to merge fields by priority
+    acceptance_criteria:
+      - Records with same title/year merged
+      - Conflicts resolved using trust score or source priority
+    kpis:
+      - merged_entry_rate: "% of entries with fields from multiple sources"
+      - avg_fields_per_merged_entry: "Fields per enriched record"
+
+  - strategy: Accept “title-only” entries
+    implication: Do not reject sparse data
+    implementation: Store minimal entries and mark for enrichment
+    acceptance_criteria:
+      - Entries with only `title` are stored with `enrichment_needed: true`
+    kpis:
+      - title_only_ratio: "% of new entries that are title-only"
+      - enrichment_backlog_size: "# of entries needing enrichment"
+
+  - strategy: Full pipeline in mock mode
+    implication: End-to-end testing offline
+    implementation: Run parse → extract → store using saved HTML
+    acceptance_criteria:
+      - MOCK_MODE executes full flow with local fixtures
+    kpis:
+      - mock_pipeline_pass_rate: "% of mock tests passing"
+      - fixture_coverage: "% of unit tests using mock HTML"
+
+  - strategy: Retry queues for failures
+    implication: Increase resilience and success rate
+    implementation: Store failed URLs with retry metadata
+    acceptance_criteria:
+      - Failed crawls added to retry queue
+      - Max retry attempts enforced
+    kpis:
+      - retry_success_rate: "% of failed pages recovered after retries"
+      - avg_retry_delay: "Avg. delay before retrying"
+
+  - strategy: Editor enrichment support
+    implication: Manual review and correction pipeline
+    implementation: Admin tool or interface for external users
+    acceptance_criteria:
+      - External UI supports editing key metadata
+    kpis:
+      - avg_editor_time: "Minutes per enriched record"
+      - weekly_records_edited: "# of edited records per week"
+
+  - strategy: Modular field sets by domain
+    implication: Prepare for multi-domain expansion (games, tech stacks)
+    implementation: Field schemas per content type (film/game/tech)
+    acceptance_criteria:
+      - Schema is modular and domain-aware
+    kpis:
+      - schema_coverage_rate: "% of valid fields covered by schema"
+      - parse_error_rate: "% of entries failing schema validation"
+
+  - strategy: Backend-first with lightweight API layer
+    implication: Focus on internal workflows with optional external integration
+    implementation: Build flexible backend; expose GET/PATCH via REST
+    acceptance_criteria:
+      - REST API exposes film lookup and update routes
+      - Auto-generated OpenAPI docs post-stabilization
+    kpis:
+      - api_uptime: "% availability of public/private API"
+      - film_lookup_response_time: "Avg. ms for GET /film/:id"

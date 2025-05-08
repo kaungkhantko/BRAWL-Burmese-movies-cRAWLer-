@@ -1,173 +1,110 @@
-# Burmese Movies Catalogue – Architecture Overview
+````markdown
+# 📑 Burmese Movies Catalogue – Developer Documentation
 
-## Purpose
+## 📌 Scope
 
-The Burmese Movies Catalogue is a modular, extensible web crawling platform that collects, normalizes, and enriches metadata on Burmese cinema — including films that are:
-- In Burmese language,
-- Directed by Burmese filmmakers,
-- Feature Burmese cast, or
-- Shot in Myanmar.
+This document supports developers working on the **Burmese Movies Catalogue crawler** by outlining its validation pipeline, mock mode, and test strategy.
 
-It is designed to evolve into a broader **metadata aggregation and analytics system** that includes other verticals such as **video games**, while supporting a **searchable frontend** and **built-in analytics** dashboard.
+It complements the following key documents:
 
----
-
-## Architecture Layers
-
-### 1. **Crawler Engine**
-- Built with Scrapy and Selenium (headless Chrome)
-- Periodic runs with retry logic and resumption support
-- Accuracy-focused over speed; scalable to parallelization
-- Logs failed attempts and invalid links
-
-### 2. **Link & Structure Classifier**
-- Uses heuristics and fuzzy logic to:
-  - Filter invalid links
-  - Distinguish between catalogue, detail, and unknown pages
-  - Score catalogue likelihood using modular rule sets
-
-### 3. **Field Extractor**
-- Applies universal selectors across domains
-- Uses `fuzzywuzzy` to associate HTML snippets with fields like:
-  - Title
-  - Genre
-  - Synopsis
-  - Director
-- Supports OpenAI-assisted fallback parsing (via `openai_selector.py`)
-
-### 4. **Site Profiles**
-- Maintains evolving per-domain behavior
-- Centralized control with future override system
-- Supports differences in site layout and quality
-
-### 5. **Output Layer**
-- Outputs JSON with UTF-8 encoding
-- Tracks source provenance (field → URL → selector)
-- Run summaries include scrape count, duration, and error/warning logs
-
-### 6. **Analytics & Frontend** *(Planned)*
-- Searchable frontend powered by metadata
-- Built-in dashboards for field completeness, tag frequency, and trend analysis
-- Cloud-hosted dashboard in the future
+- [`README.md`](../README.md) — high-level project vision, features, usage
+- [`architecture.md`](architecture.md) — current & future system design, diagrams, pain-points
+- [`business_requirements.yaml`](business_requirements.yaml) — functional goals, constraints, KPIs
 
 ---
 
-## Data Flow
+## 🧪 Pydantic-Based Validation
+
+All scraped items are validated using **Pydantic** before being stored or exported.
+
+### 📋 Key Validation Rules
+
+- `title` is required and cannot be blank
+- `year` must fall between 1900 and 2100
+- `poster_url` and `streaming_link` must be valid URLs
+- `cast` must be either a comma-separated string or list of strings
+- `synopsis` must be ≤ 1000 characters
+- Leading/trailing whitespace is stripped from all string fields
+
+### 📁 Schema Location
+
+- **Definition**: `burmese_movies_crawler/schema/item_schema.py`
+- **Validation Logic**: `burmese_movies_crawler/pipelines/burmese_pipeline.py`
+
+---
+
+## 🧪 Validation Flow Summary
 
 ```text
-[Start URLs]
-     ↓
-[Crawler Engine] → [Retry / Resume Manager]
-     ↓
-[Page Type Classifier]
-     ↓
-  ┌────────────┐
-  │ Catalogue? │─────→ [Extract Links → Follow]
-  └─────┬──────┘
-        ↓
-  [Detail Page?]
-        ↓
-[Field Extractor + Provenance Tracker]
-        ↓
-[Output JSON + Summary Log]
+🕷️  Crawl (Scrapy Spider)
+      ↓
+🧱  Parse HTML Content
+      ↓
+📦  Build Scrapy Item (BurmeseMoviesItem)
+      ↓
+✅  Pydantic Validation (MovieItem Schema)
+    ├─ Valid → Pass to Pipeline
+    └─ Invalid → Drop & Log Warning
+      ↓
+🧹  Transform / Normalize (optional enrichments)
+      ↓
+📝  Store in JSON / Database / Export Format
 ````
 
 ---
 
-## Design Principles
+## 🧪 Unit Testing Coverage
 
-* **Centralized logic, modular inputs**: One crawler, many sites.
-* **Flexible schema**: Output adapts to what is extractable.
-* **Source-aware**: Each data point carries where it came from.
-* **Extensible foundation**: Future-proofed for new verticals and analytics.
-* **Retry-resilient**: Can resume partial scrapes and retry failing URLs.
+Validation logic is tested under:
 
----
+```text
+tests/unit/test_item_schema.py
+```
 
-## 📐 Data Validation
+Includes edge case tests for:
 
-To ensure consistent and high-quality data throughout the scraping pipeline, the project uses **Pydantic-based validation** before any item is persisted or exported.
+* Empty or malformed fields
+* Invalid URLs
+* Incorrect data types
+* Unicode normalization
 
-## ✅ Implementation
+Run tests with:
 
-* The schema is defined in [`burmese_movies_crawler/schema/item_schema.py`](../burmese_movies_crawler/schema/item_schema.py).
-* Validation is performed in the item pipeline (`BurmeseMoviesPipeline`) using the Pydantic `MovieItem` model.
-* Invalid items are automatically dropped and logged with a warning message.
-* The `MovieItem` schema enforces:
-
-  * Non-empty `title` and `director` fields
-  * Reasonable `year` bounds (1900–2100)
-  * Optional `cast` field that supports both comma-separated strings and cleaned lists
-  * Auto-stripping of whitespace in strings and list elements
-  * Rejection of overly long `synopsis` entries (max 1000 characters)
-  * Validation of proper URL formats for `poster_url` and `streaming_link`
-
-### 🧪 Testing
-
-* Validation logic is tested under `tests/unit/test_item_schema.py` using `pytest`.
-* Edge cases are included, such as:
-
-  * Empty or whitespace-only fields
-  * Malformed URLs
-  * Unexpected formats in `cast` and `synopsis`
+```bash
+pytest tests/
+```
 
 ---
 
-### Validation FLow
+## 🧪 Mock Mode (Offline Testing)
 
+Mock Mode allows you to run the crawler entirely offline, simulating real runs using saved HTML files.
 
-🕷️  Crawl (Scrapy Spider)
-      |
-      v
-🧱  Parse HTML Content
-      |
-      v
-📦  Build Scrapy Item (BurmeseMoviesItem)
-      |
-      v
-✅  Pydantic Validation (MovieItem Schema)
-    ├─ Valid → Pass to Pipeline
-    └─ Invalid → Drop & Log Warning
-      |
-      v
-🧹  Transform / Normalize (optional enrichments)
-      |
-      v
-📝  Store in JSON / Database / Export Format
+### 💡 Why Use It?
 
+* Enables deterministic testing without network/Selenium
+* CI-friendly and lightweight
+* Useful for debugging extraction and selectors
 
----
-
-## Running in Mock Mode (Offline Testing)
-
-You can run the crawler entirely offline using local HTML files by enabling Mock Mode. This is useful for:
-
-* Fast, deterministic testing without hitting live sites
-* Iterating on parsing logic using saved fixtures
-* Avoiding network/Selenium dependencies in CI environments
-
-### How to Run
+### ▶️ How to Enable
 
 ```bash
 MOCK_MODE=true python run_spider.py
 ```
 
-This will:
+### 📁 How It Works
 
-* Skip all live requests and Selenium usage
-* Load pre-saved HTML from `tests/fixtures/` based on the hashed URL
-* Output results normally to the `/output/` directory
+* Replaces all network/Selenium requests with local files
+* Matches saved HTML fixtures based on MD5 hash of original URL
 
-### Fixture File Naming
-
-Each fixture file must be named using the MD5 hash of the target URL. For example:
+### 🏷 Fixture Naming Convention
 
 ```python
 import hashlib
 print(hashlib.md5("https://example.com".encode()).hexdigest())
 ```
 
-Save the raw HTML as:
+Save the corresponding file as:
 
 ```text
 tests/fixtures/<md5_hash>.html
@@ -175,17 +112,19 @@ tests/fixtures/<md5_hash>.html
 
 ---
 
-## Future Enhancements
+## 🔁 Related Files
 
-* [ ] Parallelized crawl orchestration
-* [ ] Schema drift detection (site layout changes)
-* [ ] Dynamic throttling / rate control
-* [ ] OpenAI-based labelers or normalizers
-* [ ] Cloud deployment + scheduling (e.g., GitHub Actions, Airflow, or Lambda)
-* [ ] Frontend filtering + faceted search (e.g., genre, year, director)
+* `run_spider.py` – Entry point for the crawler
+* `tests/fixtures/` – Directory for local HTML test pages
+* `tests/unit/` – Pytest unit tests for schema and parsing
+* `output/` – Generated results from each run
 
 ---
 
-## Author
+## 🧭 What’s Not in This File
 
-Built and maintained by a solo developer dedicated to ethical, inclusive technology that preserves and promotes Burmese creative work.
+* Strategic rationale: see [`README.md`](../README.md)
+* Architecture diagrams: see [`architecture.md`](architecture.md)
+* System goals & KPIs: see [`requirements_strategy_execution.md`](requirements_strategy_execution.md)
+
+---

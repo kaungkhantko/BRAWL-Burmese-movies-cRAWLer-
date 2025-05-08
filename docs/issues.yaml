@@ -1,13 +1,3 @@
-# === BRAWL Web Crawler System Design • COMPREHENSIVE ANALYSIS AND ACTIONABLE IMPROVEMENTS ===
-# Each entry:
-#   component   – What part of the system is in focus
-#   category    – Architecture | Performance | DataQuality | Ops | Testing | Security | Dependency | Storage | i18n
-#   severity    – high / medium / low  (engineering risk to delivering correct data)
-#   impact      – Why it matters in practice
-#   suggestion  – Actionable next step(s)
-#   status      – todo | in_progress | done  (keep updated during sprints)
-# -------------------------------------------------------------------------------
-
 - component: MoviesSpider vs Orchestrator
   category: Architecture
   severity: high
