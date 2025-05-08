@@ -24,6 +24,9 @@ import yaml
 import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configuration
 YAML_PATH = "docs/issues.yaml"
@@ -32,7 +35,7 @@ if "GITHUB_REPOSITORY" in os.environ:
     REPO_OWNER, REPO_NAME = os.environ["GITHUB_REPOSITORY"].split("/")
 else:
     REPO_OWNER = os.environ.get("GITHUB_OWNER", "")
-    REPO_NAME = os.environ.get("GITHUB_REPO", "burmese_movies_catalogue")
+    REPO_NAME = os.environ.get("GITHUB_REPO", "BRAWL-Burmese-movies-cRAWLer-")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")  # Your GitHub personal access token
 ISSUE_LABEL = "crawler-issue"  # Label to identify issues managed by this script
 
@@ -84,17 +87,20 @@ def setup_api_headers() -> Dict[str, str]:
     }
 
 def load_yaml_issues() -> Tuple[str, List[Dict[str, Any]]]:
-    """Load issues from YAML file."""
+    """Load issues from YAML file, whether it's a dict or a top-level list."""
     try:
         with open(YAML_PATH, 'r', encoding='utf-8') as file:
             content = file.read()
-            # Extract the header (everything before "Further Improvements:")
-            header_match = re.search(r'^(.*?Further Improvements:)', content, re.DOTALL)
-            header = header_match.group(1) if header_match else ""
-            
-            # Parse the YAML content
+            header = ""  # Skip extracting custom headers now
             data = yaml.safe_load(content)
-            issues = data.get("Further Improvements", [])
+
+            if isinstance(data, list):
+                issues = data
+            elif isinstance(data, dict):
+                issues = data.get("Further Improvements", [])
+            else:
+                raise ValueError("Unrecognized YAML structure: expected list or dict")
+
             return header, issues
     except Exception as e:
         print(f"Error loading YAML file: {e}")
@@ -352,9 +358,14 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], github_issues: List[Dict
     # Process each GitHub issue
     for github_issue in github_issues:
         yaml_data = extract_yaml_from_body(github_issue["body"])
-        if not yaml_data or "component" not in yaml_data:
-            print(f"Skipping GitHub issue #{github_issue['number']}: No valid YAML data")
+        if not yaml_data:
+            print(f"[WARN] GitHub issue #{github_issue['number']} has no embedded YAML block")
             continue
+
+        if "component" not in yaml_data:
+            print(f"[WARN] GitHub issue #{github_issue['number']} YAML missing 'component' field")
+            continue
+
         
         component = yaml_data["component"]
         
@@ -378,12 +389,27 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], github_issues: List[Dict
             added += 1
             print(f"Added local issue: {component}")
     
-    print(f"Local pull complete: {added} added, {updated} updated")
+    if added == 0 and updated == 0:
+        print("✅ No new issues added. Everything is in sync.")
+    else:
+        print(f"✅ Pull summary: {added} added, {updated} updated")
     return yaml_issues
 
 def main():
     parser = argparse.ArgumentParser(description="Sync between local YAML issues and GitHub issues")
-    parser.add_argument("--mode", choices=["pull", "push", "sync"], default="sync", help="Sync mode: pull (GitHub → YAML), push (YAML → GitHub), or sync (bidirectional)").add_argument("--dry-run", action="store_true", help="Preview actions without making changes")
+    parser.add_argument(
+        "--mode",
+        choices=["pull", "push", "sync"],
+        default="sync",
+        help="Sync mode: pull (GitHub → YAML), push (YAML → GitHub), or sync (bidirectional)"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview actions without making changes"
+    )
+
     args = parser.parse_args()
     
     # Check if GitHub token is set
