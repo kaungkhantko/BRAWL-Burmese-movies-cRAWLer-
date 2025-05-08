@@ -1,0 +1,178 @@
+# === BRAWL Web Crawler System Design • COMPREHENSIVE ANALYSIS AND ACTIONABLE IMPROVEMENTS ===
+# Each entry:
+#   component   – What part of the system is in focus
+#   category    – Architecture | Performance | DataQuality | Ops | Testing | Security | Dependency | Storage | i18n
+#   severity    – high / medium / low  (engineering risk to delivering correct data)
+#   impact      – Why it matters in practice
+#   suggestion  – Actionable next step(s)
+#   status      – todo | in_progress | done  (keep updated during sprints)
+# -------------------------------------------------------------------------------
+
+- component: MoviesSpider vs Orchestrator
+  category: Architecture
+  severity: high
+  impact: Overlapping responsibilities blur ownership; harder to unit-test
+  suggestion: Let Orchestrator own classification/extraction; Spider handles I/O only
+  status: todo
+  github_issue: 24
+- component: PageClassifier (rule-based)
+  category: Architecture
+  severity: medium
+  impact: Static thresholds break on layout shifts; brittle at scale
+  suggestion: Add rule-firing telemetry + prepare dataset for lightweight ML fallback
+  status: todo
+  github_issue: 25
+- component: Site Profiles
+  category: Architecture
+  severity: medium
+  impact: Treating every site identically causes unnecessary fallbacks & noise
+  suggestion: YAML/JSON "site profile" layer (selectors, JS flag, field map, rate limit)
+  status: todo
+  github_issue: 26
+- component: Crawl Resume / Checkpointing
+  category: Architecture
+  severity: medium
+  impact: Long jobs lose progress on crash; duplicates on restart
+  suggestion: Persist crawl state (scrapy-checkpoint or Redis queue) for resume
+  status: todo
+  github_issue: 27
+- component: SeleniumManager coupling
+  category: Performance
+  severity: high
+  impact: JS rendering dominates crawl time & RAM; hard to parallelise
+  suggestion: Make JS rendering configurable per-domain; evaluate Playwright async pool
+  status: todo
+  github_issue: 28
+- component: Async I/O & Concurrency tuning
+  category: Performance
+  severity: high
+  impact: Sequential blocking lowers throughput; won't meet daily re-crawl SLA
+  suggestion: Use asyncio-driven renderer workers; tune CONCURRENT_REQUESTS, auto-throttle
+  status: todo
+  github_issue: 29
+- component: Deduplication / Caching (URLs & Items)
+  category: Performance
+  severity: medium
+  impact: Redundant fetches waste bandwidth; duplicates inflate dataset
+  suggestion: Enable scrapy-deltafetch or hash-based URL cache + item fingerprinting
+  status: todo
+  github_issue: 30
+- component: Memory Footprint on Large Pages
+  category: Performance
+  severity: low
+  impact: Big HTML (video portals) can OOM small containers
+  suggestion: Stream parse with lxml.iterparse or size guard before DOM-heavy ops
+  status: todo
+  github_issue: 31
+- component: FieldExtractor._match_field
+  category: DataQuality
+  severity: high
+  impact: Fuzzy mis-mapping leaks incorrect labels (director → cast, etc.)
+  suggestion: Threshold ≥ 80; log scores; switch fuzzywuzzy ➜ rapidfuzz for speed
+  status: todo
+  github_issue: 32
+- component: CandidateExtractor recall/precision
+  category: DataQuality
+  severity: medium
+  impact: Noisy blocks pass to Trafilatura, increasing false positives
+  suggestion: Pre-filter blocks lacking ≥2 core fields (title/year/director)
+  status: todo
+  github_issue: 33
+- component: Pipeline Validation & Quality Metrics
+  category: DataQuality
+  severity: medium
+  impact: Silent schema drift or empty fields degrade downstream analytics
+  suggestion: Add "data quality monitor" step (null %, value ranges, year sanity) + Prometheus gauges
+  status: todo
+  github_issue: 34
+- component: Provenance Tracking
+  category: DataQuality
+  severity: low
+  impact: Hard to audit errors without source HTML/context
+  suggestion: Store raw HTML hash + selector paths alongside parsed item
+  status: todo
+  github_issue: 35
+- component: Logging & Metrics
+  category: Ops
+  severity: high
+  impact: Limited visibility into crawl health, error spikes, rule misfires
+  suggestion: Structured JSON logs, Prometheus counters, Grafana dashboard
+  status: todo
+  github_issue: 36
+- component: Retry / Backoff Strategy
+  category: Ops
+  severity: medium
+  impact: Transient 5xx or 429 may lead to unnecessary failures
+  suggestion: Exponential backoff + circuit-breaker on domain; alert on >N retries
+  status: todo
+  github_issue: 37
+- component: Mock Mode Maintenance
+  category: Ops
+  severity: low
+  impact: Fixtures grow stale; tests diverge from prod reality
+  suggestion: Provide "fixture refresh" script + CI job to flag diff vs live HTML
+  status: todo
+  github_issue: 38
+- component: Multilingual & Encoding Tests
+  category: Testing
+  severity: medium
+  impact: UTF-8/Unicode edge cases break extraction on Burmese + mixed sites
+  suggestion: Parametrised pytest fixtures with varied encodings; random sample fuzzing
+  status: todo
+  github_issue: 39
+- component: JavaScript-heavy Site Tests
+  category: Testing
+  severity: low
+  impact: Selenium logic untested in headless CI; regressions unnoticed
+  suggestion: GitHub Actions parallel job with xvfb / Playwright for JS examples
+  status: todo
+  github_issue: 40
+- component: Coverage & Static Analysis
+  category: Testing
+  severity: low
+  impact: Hidden dead code and style drift
+  suggestion: Enforce ≥85 % coverage; run ruff/black/mypy in pipeline
+  status: todo
+  github_issue: 41
+- component: robots.txt / Policy Compliance
+  category: Security
+  severity: medium
+  impact: Legal or ethical violations against target sites
+  suggestion: Obey robots.txt + custom per-site exemptions list + user-agent string
+  status: todo
+  github_issue: 42
+- component: Request Rate-Limiting & IP Rotation
+  category: Security
+  severity: low
+  impact: Gets blocked or captchas triggered
+  suggestion: Polite delay per domain; rotating proxy pool w/ respect for TOS
+  status: todo
+  github_issue: 43
+- component: Library Versions & CVE Scanning
+  category: Dependency
+  severity: medium
+  impact: Outdated Selenium / fuzzywuzzy pose security + performance risks
+  suggestion: Pin in requirements-lock; dependabot + safety check in CI
+  status: todo
+  github_issue: 44
+- component: Schema Versioning & Migrations
+  category: Storage
+  severity: low
+  impact: Breaking changes require backfills and API bumps
+  suggestion: Adopt semantic version on MovieItem; migration scripts for DB
+  status: todo
+  github_issue: 45
+- component: Incremental Upserts
+  category: Storage
+  severity: low
+  impact: Full re-imports overwrite manual corrections
+  suggestion: Upsert by (title, year) PK; keep "last_seen" + "changed" timestamps
+  status: todo
+  github_issue: 46
+- component: Date / Number Localisation
+  category: i18n
+  severity: low
+  impact: Different calendars or Burmese numerals mis-parsed
+  suggestion: Use dateparser with "languages=['my', 'en']"; normalise numerals
+  status: todo
+  github_issue: 47

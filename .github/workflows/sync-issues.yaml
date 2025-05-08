@@ -1,0 +1,30 @@
+name: Sync Issues Between YAML and GitHub
+
+on:
+  push:
+    branches:
+      - main  # Or your default branch
+  workflow_dispatch:
+
+jobs:
+  sync-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: |
+          pip install PyYAML requests
+
+      - name: Run issue sync
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python scripts/sync_issues.py --mode=sync
