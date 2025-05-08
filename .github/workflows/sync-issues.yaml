@@ -20,7 +20,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install PyYAML requests
+          pip install PyYAML requests dotenv
 
       - name: Run issue sync
         env:

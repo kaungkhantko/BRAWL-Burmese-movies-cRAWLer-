@@ -13,7 +13,7 @@ Usage:
     python sync_issues.py --mode=sync  # Bidirectional sync (default)
 
 Requirements:
-    pip install pyyaml requests
+    pip install pyyaml requests dotenv
 """
 
 import argparse
