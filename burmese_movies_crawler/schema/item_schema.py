@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, HttpUrl
 from typing import Optional, List, Union
-
+from datetime import datetime
 class MovieItem(BaseModel):
     title: str = Field(..., min_length=1)
     year: int
@@ -13,9 +13,12 @@ class MovieItem(BaseModel):
 
     @field_validator("year")
     def year_must_be_reasonable(cls, v):
-        if not (1900 <= v <= 2100):
-            raise ValueError("Year must be between 1900 and 2100")
+        current_year = datetime.now().year
+        upper_bound = current_year + 5
+        if not (1800 <= v <= upper_bound):
+            raise ValueError(f"Year must be between 1800 and {upper_bound}")
         return v
+
 
     @field_validator("title", "director", mode="before")
     def strip_text_fields(cls, v):

@@ -1,5 +1,9 @@
 name: Sync Issues Between YAML and GitHub
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   push:
     branches:

@@ -1,4 +1,3 @@
-````markdown
 # 📑 Burmese Movies Catalogue – Developer Documentation
 
 ## 📌 Scope
@@ -9,7 +8,7 @@ It complements the following key documents:
 
 - [`README.md`](../README.md) — high-level project vision, features, usage
 - [`architecture.md`](architecture.md) — current & future system design, diagrams, pain-points
-- [`business_requirements.yaml`](business_requirements.yaml) — functional goals, constraints, KPIs
+- [`requirements_strategy_execution.md`](requirements_strategy_execution.md) — functional goals, constraints, KPIs
 
 ---
 
@@ -20,7 +19,7 @@ All scraped items are validated using **Pydantic** before being stored or export
 ### 📋 Key Validation Rules
 
 - `title` is required and cannot be blank
-- `year` must fall between 1900 and 2100
+- `year` must be <= current year + 5 years 
 - `poster_url` and `streaming_link` must be valid URLs
 - `cast` must be either a comma-separated string or list of strings
 - `synopsis` must be ≤ 1000 characters
@@ -28,8 +27,7 @@ All scraped items are validated using **Pydantic** before being stored or export
 
 ### 📁 Schema Location
 
-- **Definition**: `burmese_movies_crawler/schema/item_schema.py`
-- **Validation Logic**: `burmese_movies_crawler/pipelines/burmese_pipeline.py`
+- **Validation Logic**: `burmese_movies_crawler/schema/item_schema.py`
 
 ---
 
@@ -48,25 +46,12 @@ All scraped items are validated using **Pydantic** before being stored or export
       ↓
 🧹  Transform / Normalize (optional enrichments)
       ↓
-📝  Store in JSON / Database / Export Format
+📝  Store
 ````
 
 ---
 
-## 🧪 Unit Testing Coverage
-
-Validation logic is tested under:
-
-```text
-tests/unit/test_item_schema.py
-```
-
-Includes edge case tests for:
-
-* Empty or malformed fields
-* Invalid URLs
-* Incorrect data types
-* Unicode normalization
+## 🧪 Testing
 
 Run tests with:
 
@@ -116,7 +101,7 @@ tests/fixtures/<md5_hash>.html
 
 * `run_spider.py` – Entry point for the crawler
 * `tests/fixtures/` – Directory for local HTML test pages
-* `tests/unit/` – Pytest unit tests for schema and parsing
+* `tests/` – Test files
 * `output/` – Generated results from each run
 
 ---
@@ -128,3 +113,35 @@ tests/fixtures/<md5_hash>.html
 * System goals & KPIs: see [`requirements_strategy_execution.md`](requirements_strategy_execution.md)
 
 ---
+
+## Next Steps (For this documentation file)
+
+1. **Expand Validation Documentation**
+   * Add examples of common validation errors and troubleshooting
+   * Document custom validators and field transformers
+   * Create validation rule reference table with rationale
+
+2. **Enhance Mock Mode Guide**
+   * Add step-by-step tutorial for creating new fixtures
+   * Document fixture organization best practices
+   * Include examples of fixture-based test cases
+
+3. **Add Developer Workflow Section**
+   * Local development setup instructions
+   * Code contribution guidelines
+   * PR review process
+
+4. **Create Troubleshooting Guide**
+   * Common extraction failures and solutions
+   * Debugging validation pipeline issues
+   * Performance optimization tips
+
+5. **Add API Documentation**
+   * Document crawler output formats (JSON, CSV)
+   * Explain field normalization rules
+   * Provide sample output schemas
+
+6. **Include CI/CD Pipeline Documentation**
+   * Test coverage requirements
+   * Automated validation checks
+   * Release process

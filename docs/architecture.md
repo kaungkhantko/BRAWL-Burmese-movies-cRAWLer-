@@ -1,10 +1,11 @@
-# Burmese Movies Catalogue — System Design (**Version 3 — Requirements‑Aligned**)
+# Burmese Movies Catalogue — System Design
 
-> **Purpose**  
-> Provide a single, authoritative description of where the crawler *is today* **and** where it is going next.
-> This V3 document:
-> • captures the **current (baseline) architecture** for context, and
-> • details the **next‑generation Architecture V3**, fully aligned with the *BRAWL Web Crawler – Business Requirements & Execution Map*.
+## **Purpose**  
+
+Provide a single, authoritative description of where the crawler *is today* **and** where it is going next.
+This architecture document:
+- captures the **current (baseline) architecture** for context, and
+- details the **next‑generation proposed Architecture**, fully aligned with the [*BRAWL Web Crawler – Requirements & Execution Map*](/docs/requirements_strategy_execution.md).
 
 ---
 
@@ -15,7 +16,7 @@
    1.2 [Flow Diagram](#12-flow-diagram)  
    1.3 [Component Descriptions](#13-component-descriptions)  
 2. [Requirement Alignment](#2--requirement-alignment)  
-3. [Architecture V3 Overview](#3--architecture-v3-overview)  
+3. [Proposed Architecture Overview](#3--proposed-architecture-overview)  
    3.1 [Key Principles](#31-key-principles)  
    3.2 [Class Diagram](#32-class-diagram)  
    3.3 [Flow Diagram](#33-flow-diagram)  
@@ -28,7 +29,7 @@
 
 ## 1 · Current Architecture
 
-> *This section documents the baseline implementation that is live today (pre‑V3). It provides a reference point for measuring progress and identifying technical debt.*
+> *This section documents the baseline implementation that is live today. It provides a reference point for measuring progress and identifying technical debt.*
 
 ### 1.1 Class Diagram
 
@@ -74,6 +75,16 @@ classDiagram
         +__enter__(): WebDriver
         +__exit__(exc_type, exc_val, exc_tb)
     }
+    class BurmeseMoviesItem {
+        +title: scrapy.Field
+        +year: scrapy.Field
+        +director: scrapy.Field
+        +cast: scrapy.Field
+        +genre: scrapy.Field
+        +synopsis: scrapy.Field
+        +poster_url: scrapy.Field
+        +streaming_link: scrapy.Field
+    }
     class MovieItem {
         +title: str
         +year: int
@@ -83,7 +94,19 @@ classDiagram
         +synopsis: Optional[str]
         +poster_url: Optional[HttpUrl]
         +streaming_link: Optional[HttpUrl]
+        +year_must_be_reasonable()
+        +strip_text_fields()
+        +split_and_strip_cast()
+        +clean_synopsis()
+        +check_synopsis_length()
     }
+    
+    %% Relationships
+    MoviesSpider --> PageClassifier: uses
+    MoviesSpider --> FieldExtractor: uses
+    MoviesSpider --> SeleniumManager: uses
+    MoviesSpider --> BurmeseMoviesItem: creates
+    BurmeseMoviesItem ..> MovieItem: validated by
 ```
 
 ### 1.2 Flow Diagram
@@ -118,7 +141,7 @@ flowchart TD
 
 ## 2 · Requirement Alignment
 
-| Requirement Theme                                                                                          | V3 Architectural Response                                                                                                                         |
+| Requirement Theme                                                                                          | Proposed Architectural Response                                                                                                                         |
 | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Mission & Users** — searchable Burmese film catalogue, export, future API.                               | Public **Film API** (+OpenAPI), **Search Indexer**, and **Editor Dashboard** built on canonical DB.                                               |
 | **Content Scope** — films, series, docs, shorts; Unicode/Zawgyi; title‑only allowed; provenance per field. | **Schema Registry** with *Film* schema (modular field set); **Field‑level Provenance Store**; entries support `enrichment_needed`.                |
@@ -132,7 +155,7 @@ flowchart TD
 
 ---
 
-## 3 · Architecture V3 Overview
+## 3 · Proposed Architecture Overview
 
 ### 3.1 Key Principles
 
@@ -145,7 +168,6 @@ flowchart TD
 7. **CI Enforced** — site‑profile contract tests & mock‑mode smoke tests in GitHub Actions.
 
 ### 3.2 Class Diagram
-
 ```mermaid
 classDiagram
     %% ─────────── Crawl Control ───────────
@@ -171,6 +193,7 @@ classDiagram
         +save()
         +load()
     }
+
     %% ─────────── Page Processing ───────────
     class Orchestrator {
         +handle(response): ExtractResult
@@ -190,6 +213,7 @@ classDiagram
     class EntityResolver {
         +merge(item): CanonicalItem
     }
+
     %% ─────────── Validation & Storage ───────────
     class DataQualityMonitor {
         +validate(item): bool
@@ -209,8 +233,23 @@ classDiagram
     class SchemaRegistry {
         +get_schema(content_type)
     }
-    class FilmAPI {}
-    class SearchIndexer {}
+
+    %% ─────────── Indexing & API ───────────
+    class SearchIndexer {
+        +update_index(item)
+        +query_index(params): list
+        +reindex_all()
+        +index_status(): dict
+    }
+    class FilmAPI {
+        +get_film(id): Film
+        +search_films(query): list[Film]
+        +update_film(id, fields): Film
+        +export_dataset(filter): JSON
+    }
+    class EditorInterface {
+        +edit_film(id)
+    }
 
     %% ─────────── Relationships ───────────
     CrawlManager --> RequestScheduler
@@ -227,10 +266,13 @@ classDiagram
     Orchestrator --> ProvenanceStore
     Orchestrator --> EntityResolver
     Orchestrator ..> RetryQueue : on failure
+
     DataQualityMonitor --> MetricsCollector
-    ProvenanceStore --> SearchIndexer
-    EntityResolver --> SearchIndexer
-    SearchIndexer --> FilmAPI
+    ProvenanceStore --> SearchIndexer : log source
+    EntityResolver --> SearchIndexer : update index
+    SearchIndexer --> FilmAPI : query + fetch
+    EditorInterface --> FilmAPI : PATCH/edit
+    FilmAPI --> EntityResolver : update enrichment
     SchemaRegistry <.. FieldExtractor
 ```
 
@@ -256,13 +298,21 @@ flowchart TD
 
     C1 -->|pass| D1[EntityResolver.merge]
     C1 -->|fail| A1
-
-    D1 --> E1[ProvenanceStore.save]
-    D1 --> E2[SearchIndexer.update]
-
     C1 --> F1[MetricsCollector]
     A6 --> F1
     A1 --> F1
+
+    D1 --> E1[ProvenanceStore.save]
+    D1 --> E2[SearchIndexer.update_index]
+
+    E2 --> G1[FilmAPI.query/search]
+
+    subgraph Enrichment
+        G2[EditorInterface] --> G3[FilmAPI.update_film]
+        %% merge updates into canonical items
+        G3 --> D1
+    end
+
 ```
 
 ### 3.4 Component Glossary (Key Points Only)

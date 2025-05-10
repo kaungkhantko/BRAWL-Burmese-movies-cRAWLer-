@@ -1,4 +1,4 @@
-# 📚 BRAWL Web Crawler – Business Requirements & Execution Strategy
+# 📚 BRAWL Web Crawler – Requirements & Execution Strategy
 
 This document outlines the **functional goals**, **data constraints**, **strategic priorities**, and **operational expectations** for the BRAWL Web Crawler project, designed to power the **Burmese Movies Catalogue** — a searchable and research-oriented film metadata platform.
 
@@ -166,20 +166,20 @@ To create a **comprehensive and searchable catalogue of Burmese films**, includi
 
 ## 📊 Strategy Alignment Map (Execution Overview)
 
-| **Strategy**                  | **Implementation Summary**                               | **KPIs**                                              |
-| ----------------------------- | -------------------------------------------------------- | ----------------------------------------------------- |
-| **Research-first accuracy**   | Use authoritative sources, editorial validation          | ≥ 30% award-tagged entries, 100% key fields reviewed  |
-| **Breadth over depth**        | Accept sparse data; enrich later                         | ≤ 60% title-only entries, ≥ 20% upgraded monthly      |
-| **Provenance per field**      | Source stored per field in DB/JSON                       | ≥ 95% provenance coverage, ≥ 2 sources per film       |
-| **Free domain crawling**      | No link restrictions within a domain                     | ≥ 90% crawl success, median depth 3–5                 |
-| **Selective JS rendering**    | Render only on whitelisted domains                       | ≤ 10% of pages rendered, < 8s render time             |
-| **Multi-source merging**      | Combine entries using fuzzy logic and trust weighting    | ≥ 50% merged, ≥ 6 fields per enriched record          |
-| **“Title-only” records**      | Allow minimal records; flag for enrichment               | Backlog < 1,000, `enrichment_needed: true` for all    |
-| **End-to-end mock mode**      | Full pipeline works with local HTML fixtures             | 100% mock test pass rate, ≥ 80% fixture test coverage |
-| **Retry queue for failures**  | Store retry metadata, reattempt later                    | ≥ 70% retry recovery, < 48h retry lag                 |
-| **Editorial tools support**   | Admin UI for reviewing and editing metadata              | < 3 min avg. edit time, ≥ 100 entries/week edited     |
-| **Modular schemas by domain** | Maintain separate but interoperable field sets           | ≥ 90% schema coverage, < 2% validation error rate     |
-| **Backend-first API**         | Lightweight REST layer + OpenAPI docs + editor interface | 99.5% uptime, < 300ms lookup latency                  |
+| **Strategy**                  | **Implication** | **Implementation Summary**                               | **Acceptance Criteria** | **KPIs**                                              |
+| ----------------------------- | --------------- | -------------------------------------------------------- | ----------------------- | ----------------------------------------------------- |
+| **Research-first accuracy**   | Focus on canonical data (e.g., awards, verified credits) | Use authoritative sources; enable human validation loop | • Collect data from trusted sources (IMDb, TMDb, Wikipedia)<br>• Field-level provenance must be present<br>• Editorial review exists for high-value fields | • metadata_certified_rate: % of entries with award/certified data<br>• editorial_review_coverage: % of high-confidence entries reviewed |
+| **Breadth over depth**        | Crawl more films, even with minimal metadata | Accept sparse entries and flag for enrichment | • Accept entries with only a title<br>• Flag incomplete entries for enrichment pipeline | • weekly_title_only_additions: # of title-only entries/week<br>• enrichment_uplift_rate: % of partial entries upgraded monthly |
+| **Provenance per field**      | Store origin for each metadata field independently | Include source tag alongside each field in DB/JSON | • Field-level provenance shown in exports and editorial UI | • provenance_tag_coverage: % of fields with valid source tags<br>• avg_sources_per_film: Average unique sources per film |
+| **Free domain crawling**      | Flexible, deep crawling of sites | Allow all internal links unless explicitly blacklisted | • Crawler respects domain boundary but explores freely inside | • domain_crawl_success_rate: % of pages fetched successfully<br>• crawl_depth_median: Median link depth |
+| **Selective JS rendering**    | Conserve compute; only render when needed | Use Selenium selectively via domain allowlist | • Rendering turned on only for specific domains | • selenium_render_ratio: % of pages requiring JS rendering<br>• avg_render_time: Seconds per JS-rendered page |
+| **Multi-source merging**      | Single record per film with unified metadata | Use fuzzy logic to merge fields by priority | • Records with same title/year merged<br>• Conflicts resolved using trust score or source priority | • merged_entry_rate: % of entries with fields from multiple sources<br>• avg_fields_per_merged_entry: Fields per enriched record |
+| **"Title-only" records**      | Do not reject sparse data | Store minimal entries and mark for enrichment | • Entries with only `title` are stored with `enrichment_needed: true` | • title_only_ratio: % of new entries that are title-only<br>• enrichment_backlog_size: # of entries needing enrichment |
+| **End-to-end mock mode**      | End-to-end testing offline | Run parse → extract → store using saved HTML | • MOCK_MODE executes full flow with local fixtures | • mock_pipeline_pass_rate: % of mock tests passing<br>• fixture_coverage: % of unit tests using mock HTML |
+| **Retry queues for failures** | Increase resilience and success rate | Store failed URLs with retry metadata | • Failed crawls added to retry queue<br>• Max retry attempts enforced | • retry_success_rate: % of failed pages recovered after retries<br>• avg_retry_delay: Avg. delay before retrying |
+| **Editor enrichment support** | Manual review and correction pipeline | Admin tool or interface for external users | • External UI supports editing key metadata | • avg_editor_time: Minutes per enriched record<br>• weekly_records_edited: # of edited records per week |
+| **Modular field sets by domain** | Prepare for multi-domain expansion (games, tech stacks) | Field schemas per content type (film/game/tech) | • Schema is modular and domain-aware | • schema_coverage_rate: % of valid fields covered by schema<br>• parse_error_rate: % of entries failing schema validation |
+| **Backend-first API**         | Focus on internal workflows with optional external integration | Build flexible backend; expose GET/PATCH via REST | • REST API exposes film lookup and update routes<br>• Auto-generated OpenAPI docs post-stabilization | • api_uptime: % availability of public/private API<br>• film_lookup_response_time: Avg. ms for GET /film/:id |
 
 ---
 
