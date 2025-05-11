@@ -1,168 +1,466 @@
-- component: MoviesSpider vs Orchestrator
-  category: Architecture
-  severity: high
-  impact: Overlapping responsibilities blur ownership; harder to unit-test
-  suggestion: Let Orchestrator own classification/extraction; Spider handles I/O only
-  status: todo
-  github_issue: 24
-- component: PageClassifier (rule-based)
-  category: Architecture
-  severity: medium
-  impact: Static thresholds break on layout shifts; brittle at scale
-  suggestion: Add rule-firing telemetry + prepare dataset for lightweight ML fallback
-  status: todo
-  github_issue: 25
-- component: Site Profiles
-  category: Architecture
-  severity: medium
-  impact: Treating every site identically causes unnecessary fallbacks & noise
-  suggestion: YAML/JSON "site profile" layer (selectors, JS flag, field map, rate limit)
-  status: todo
-  github_issue: 26
-- component: Crawl Resume / Checkpointing
-  category: Architecture
-  severity: medium
-  impact: Long jobs lose progress on crash; duplicates on restart
-  suggestion: Persist crawl state (scrapy-checkpoint or Redis queue) for resume
-  status: todo
-  github_issue: 27
-- component: SeleniumManager coupling
-  category: Performance
-  severity: high
-  impact: JS rendering dominates crawl time & RAM; hard to parallelise
-  suggestion: Make JS rendering configurable per-domain; evaluate Playwright async pool
-  status: todo
-  github_issue: 28
-- component: Async I/O & Concurrency tuning
-  category: Performance
-  severity: high
-  impact: Sequential blocking lowers throughput; won't meet daily re-crawl SLA
-  suggestion: Use asyncio-driven renderer workers; tune CONCURRENT_REQUESTS, auto-throttle
-  status: todo
-  github_issue: 29
-- component: Deduplication / Caching (URLs & Items)
-  category: Performance
-  severity: medium
-  impact: Redundant fetches waste bandwidth; duplicates inflate dataset
-  suggestion: Enable scrapy-deltafetch or hash-based URL cache + item fingerprinting
-  status: todo
-  github_issue: 30
-- component: Memory Footprint on Large Pages
-  category: Performance
-  severity: low
-  impact: Big HTML (video portals) can OOM small containers
-  suggestion: Stream parse with lxml.iterparse or size guard before DOM-heavy ops
-  status: todo
-  github_issue: 31
-- component: FieldExtractor._match_field
-  category: DataQuality
-  severity: high
-  impact: Fuzzy mis-mapping leaks incorrect labels (director → cast, etc.)
-  suggestion: Threshold ≥ 80; log scores; switch fuzzywuzzy ➜ rapidfuzz for speed
-  status: todo
-  github_issue: 32
-- component: CandidateExtractor recall/precision
-  category: DataQuality
-  severity: medium
-  impact: Noisy blocks pass to Trafilatura, increasing false positives
-  suggestion: Pre-filter blocks lacking ≥2 core fields (title/year/director)
-  status: todo
-  github_issue: 33
-- component: Pipeline Validation & Quality Metrics
-  category: DataQuality
-  severity: medium
-  impact: Silent schema drift or empty fields degrade downstream analytics
-  suggestion: Add "data quality monitor" step (null %, value ranges, year sanity) + Prometheus gauges
-  status: todo
-  github_issue: 34
-- component: Provenance Tracking
-  category: DataQuality
-  severity: low
-  impact: Hard to audit errors without source HTML/context
-  suggestion: Store raw HTML hash + selector paths alongside parsed item
-  status: todo
-  github_issue: 35
-- component: Logging & Metrics
-  category: Ops
-  severity: high
-  impact: Limited visibility into crawl health, error spikes, rule misfires
-  suggestion: Structured JSON logs, Prometheus counters, Grafana dashboard
-  status: todo
-  github_issue: 36
-- component: Retry / Backoff Strategy
-  category: Ops
-  severity: medium
-  impact: Transient 5xx or 429 may lead to unnecessary failures
-  suggestion: Exponential backoff + circuit-breaker on domain; alert on >N retries
-  status: todo
-  github_issue: 37
-- component: Mock Mode Maintenance
-  category: Ops
-  severity: low
-  impact: Fixtures grow stale; tests diverge from prod reality
-  suggestion: Provide "fixture refresh" script + CI job to flag diff vs live HTML
-  status: todo
-  github_issue: 38
-- component: Multilingual & Encoding Tests
-  category: Testing
-  severity: medium
-  impact: UTF-8/Unicode edge cases break extraction on Burmese + mixed sites
-  suggestion: Parametrised pytest fixtures with varied encodings; random sample fuzzing
-  status: todo
-  github_issue: 39
-- component: JavaScript-heavy Site Tests
-  category: Testing
-  severity: low
-  impact: Selenium logic untested in headless CI; regressions unnoticed
-  suggestion: GitHub Actions parallel job with xvfb / Playwright for JS examples
-  status: todo
-  github_issue: 40
-- component: Coverage & Static Analysis
-  category: Testing
-  severity: low
-  impact: Hidden dead code and style drift
-  suggestion: Enforce ≥85 % coverage; run ruff/black/mypy in pipeline
-  status: todo
-  github_issue: 41
-- component: robots.txt / Policy Compliance
-  category: Security
-  severity: medium
-  impact: Legal or ethical violations against target sites
-  suggestion: Obey robots.txt + custom per-site exemptions list + user-agent string
-  status: todo
-  github_issue: 42
-- component: Request Rate-Limiting & IP Rotation
-  category: Security
-  severity: low
-  impact: Gets blocked or captchas triggered
-  suggestion: Polite delay per domain; rotating proxy pool w/ respect for TOS
-  status: todo
-  github_issue: 43
-- component: Library Versions & CVE Scanning
-  category: Dependency
-  severity: medium
-  impact: Outdated Selenium / fuzzywuzzy pose security + performance risks
-  suggestion: Pin in requirements-lock; dependabot + safety check in CI
-  status: todo
-  github_issue: 44
-- component: Schema Versioning & Migrations
-  category: Storage
-  severity: low
-  impact: Breaking changes require backfills and API bumps
-  suggestion: Adopt semantic version on MovieItem; migration scripts for DB
-  status: todo
-  github_issue: 45
-- component: Incremental Upserts
-  category: Storage
-  severity: low
-  impact: Full re-imports overwrite manual corrections
-  suggestion: Upsert by (title, year) PK; keep "last_seen" + "changed" timestamps
-  status: todo
-  github_issue: 46
-- component: Date / Number Localisation
-  category: i18n
-  severity: low
-  impact: Different calendars or Burmese numerals mis-parsed
-  suggestion: Use dateparser with "languages=['my', 'en']"; normalise numerals
-  status: todo
-  github_issue: 47
+- github_issue: 72
+  title: Refactor Spider-Orchestrator Responsibility Split
+  priority: P0
+  size: L
+  estimate_hours: 20
+  sprint: Sprint 5
+  description: Overlapping responsibilities between Spider and Orchestrator blur ownership
+    and make unit testing harder. Let Orchestrator own classification and extraction,
+    and restrict Spider to I/O operations only.
+- github_issue: 73
+  title: Improve PageClassifier Rule Robustness
+  priority: P1
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 3
+  description: Static thresholds in rule-based classification break on layout shifts
+    and do not scale well. Add rule-firing telemetry and prepare dataset for a lightweight
+    ML fallback.
+- github_issue: 97
+  title: Implement Site Profile Registry
+  priority: P0
+  size: L
+  estimate_hours: 20
+  sprint: Sprint 5
+  description: Treating all sites identically leads to fallback noise and poor extraction.
+    Implement a YAML/JSON-based site profile system to define selectors, JS flags,
+    field maps, and rate limits per site.
+- github_issue: 75
+  title: Add Crawl Resume via Checkpointing
+  priority: P0
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 6
+  description: Long-running jobs lose progress on crash and may duplicate items on
+    restart. Add state persistence using scrapy-checkpoint or Redis-based queues.
+- github_issue: 76
+  title: Decouple JS Rendering and Evaluate Async Playwright Pool
+  priority: P0
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 3
+  description: JS rendering dominates crawl time and RAM usage, making parallelism
+    difficult. Make JS rendering configurable per-domain and evaluate Playwright async
+    pools.
+- github_issue: 77
+  title: Optimize Async I/O and Concurrency Tuning
+  priority: P1
+  size: L
+  estimate_hours: 24
+  sprint: Sprint 4
+  description: Sequential blocking limits throughput and cannot meet daily re-crawl
+    SLA. Tune CONCURRENT_REQUESTS, use async renderer workers, and adjust auto-throttle
+    settings.
+- github_issue: 78
+  title: Enable Deduplication and Caching
+  priority: P1
+  size: M
+  estimate_hours: 18
+  sprint: Sprint 4
+  description: Redundant fetches waste bandwidth, and duplicates bloat the dataset.
+    Enable scrapy-deltafetch or implement hash-based caching and item fingerprinting.
+- github_issue: 79
+  title: Guard Memory Footprint on Large Pages
+  priority: P1
+  size: S
+  estimate_hours: 5
+  sprint: Sprint 5
+  description: Some HTML pages are large enough to cause OOM errors in small containers.
+    Stream parse large pages with lxml.iterparse or check size before DOM-heavy operations.
+- github_issue: 80
+  title: Improve FieldExtractor Accuracy and Speed
+  priority: P1
+  size: M
+  estimate_hours: 16
+  sprint: Sprint 1
+  description: Fuzzy mis-mapping results in incorrect field labels like director →
+    cast. Set fuzzy match threshold ≥80, log scores, and switch from fuzzywuzzy to
+    rapidfuzz.
+- github_issue: 81
+  title: Increase CandidateExtractor Precision
+  priority: P0
+  size: M
+  estimate_hours: 6
+  sprint: Sprint 3
+  description: Noisy blocks lead to false positives when passed to Trafilatura. Pre-filter
+    blocks that lack at least two of title, year, or director.
+- github_issue: 82
+  title: Add Pipeline Validation and Quality Metrics
+  priority: P2
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 6
+  description: Schema drift or missing fields silently degrade downstream data quality.
+    Add validation for null %s, value ranges, year sanity checks, and expose Prometheus
+    metrics.
+- github_issue: 83
+  title: Add Field-Level Provenance Tracking
+  priority: P0
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 4
+  description: It's hard to debug extraction errors without raw HTML context. Store
+    source HTML hash and selector paths alongside parsed data.
+- github_issue: 84
+  title: Add Structured Logging and Prometheus Metrics
+  priority: P0
+  size: M
+  estimate_hours: 16
+  sprint: Sprint 1
+  description: Crawl visibility is limited; hard to catch error spikes or misfires.
+    Add structured JSON logging, Prometheus counters, and Grafana dashboards.
+- github_issue: 85
+  title: Add Retry and Backoff Strategy
+  priority: P1
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 2
+  description: Transient 5xx or 429 errors cause unnecessary failures. Implement exponential
+    backoff, domain circuit breakers, and retry alerts.
+- github_issue: 86
+  title: Add Mock Mode Maintenance System
+  priority: P1
+  size: S
+  estimate_hours: 5
+  sprint: Sprint 6
+  description: Fixtures grow stale and diverge from production reality. Provide a
+    fixture refresh script and CI job to flag diffs against live HTML.
+- github_issue: 87
+  title: Add Multilingual and Encoding Tests
+  priority: P2
+  size: M
+  estimate_hours: 4
+  sprint: Sprint 8
+  description: UTF-8 and Unicode edge cases can break Burmese or mixed-language pages.
+    Add parameterized pytest fixtures and fuzz encodings with random samples.
+- github_issue: 88
+  title: Add JavaScript-Heavy Site Tests
+  priority: P2
+  size: S
+  estimate_hours: 6
+  sprint: Sprint 9
+  description: Selenium logic is untested in CI and can regress silently. Add GitHub
+    Actions job with xvfb or Playwright tests for JS examples.
+- github_issue: 89
+  title: Enforce Coverage and Static Analysis in CI
+  priority: P2
+  size: S
+  estimate_hours: 6
+  sprint: Sprint 10
+  description: Dead code and style drift creep in over time. Enforce ≥85% test coverage
+    and run ruff, black, and mypy in CI pipeline.
+- github_issue: 90
+  title: Obey robots.txt and Site Policies
+  priority: P1
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 9
+  description: Crawling without robots.txt compliance may cause legal or ethical issues.
+    Enforce robots.txt parsing and allow per-site opt-outs and custom user-agent strings.
+- github_issue: 91
+  title: Add Request Rate-Limiting and IP Rotation
+  priority: P0
+  size: S
+  estimate_hours: 5
+  sprint: Sprint 5
+  description: Requests can trigger blocking or captchas. Add domain-specific delay
+    and rotate proxies with respect for terms of service.
+- github_issue: 92
+  title: Pin Library Versions and Enable CVE Scanning
+  priority: P1
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 10
+  description: Unpinned libraries like Selenium and fuzzywuzzy expose security and
+    performance risks. Lock versions in requirements and enable dependabot + safety
+    checks.
+- github_issue: 93
+  title: Add Schema Versioning and Migration Scripts
+  priority: P2
+  size: M
+  estimate_hours: 12
+  sprint: Sprint 9
+  description: Breaking schema changes require costly reprocessing and may break APIs.
+    Introduce semantic versioning on MovieItem and create upgrade/downgrade scripts.
+- github_issue: 94
+  title: Support Incremental Upserts in Database
+  priority: P1
+  size: M
+  estimate_hours: 12
+  sprint: Sprint 9
+  description: Full re-imports can overwrite manually fixed records. Support upserts
+    using (title, year) as primary key and track last_seen and changed timestamps.
+- github_issue: 95
+  title: Localize Date and Number Parsing
+  priority: P1
+  size: S
+  estimate_hours: 5
+  sprint: Sprint 9
+  description: Burmese numerals and alternate calendars can cause parsing errors.
+    Use dateparser with `languages=['my', 'en']` and normalize Burmese digits.
+- github_issue: 23
+  title: Save Live Pages as Fixture Files (Auto-Fixture Generator)
+  priority: P1
+  size: S
+  sprint: Sprint 8
+  estimate_hours: 5
+  description: Create a CLI tool that takes a URL and saves the page's HTML content
+    into the correct `tests/fixtures/` location using the `md5(url).html` naming scheme.
+- github_issue: 22
+  title: Build output_schema.json Definition
+  priority: P1
+  size: S
+  sprint: Sprint 6
+  estimate_hours: 5
+  description: JSON output validated against output_schema.json; crawl aborts on schema
+    errors. Validation tests included.
+- github_issue: 21
+  title: Retry Log Persistence & Requeue
+  priority: P1
+  size: M
+  sprint: Sprint 6
+  estimate_hours: 12
+  description: Failed URL list persisted; optional flag re‑seeds next crawl. Includes
+    unit test and failed_urls.json spec.
+- github_issue: 20
+  title: Create Data Quality Report Post-Run
+  priority: P1
+  size: M
+  sprint: Sprint 6
+  estimate_hours: 12
+  description: Post‑run script outputs missing‑field counts and basic stats in Markdown/HTML.
+- github_issue: 19
+  title: Setup CLI Summary Command
+  priority: P2
+  size: S
+  sprint: Sprint 10
+  estimate_hours: 4
+  description: python -m tools.summary --last pretty‑prints most recent run summary.
+- github_issue: 18
+  title: Build Snapshot HTML Comparisons for Testing
+  priority: P1
+  size: M
+  sprint: Sprint 10
+  estimate_hours: 12
+  description: pytest --html-snapshots compares new scrape vs stored HTML; fail on
+    diff > threshold.
+- github_issue: 16
+  title: Track Field-Level Provenance
+  priority: P0
+  size: M
+  sprint: Sprint 4
+  estimate_hours: 14
+  description: Each exported field includes source_url and selector metadata.
+- github_issue: 15
+  title: Add Schema Drift Detection
+  priority: P1
+  size: L
+  sprint: Sprint 4
+  estimate_hours: 18
+  description: Crawl compares current DOM hash to last snapshot; logs warning on significant
+    drift.
+- github_issue: 13
+  title: Implement a Learning Loop for Selector Prioritization
+  priority: P2
+  size: XL
+  sprint: Sprint 7
+  estimate_hours: 40
+  description: Nightly job retrains selector ranking from crawl logs; new weights
+    applied next run.
+- github_issue: 12
+  title: Integrate Database Storage (PostgreSQL)
+  priority: P2
+  size: L
+  sprint: Sprint 8
+  estimate_hours: 20
+  description: Pipeline writes items to Postgres via SQLAlchemy. Upsert prevents dupes.
+- github_issue: 11
+  title: Add Web UI to Visualize Scraping Progress
+  priority: P2
+  size: L
+  sprint: Sprint 8
+  estimate_hours: 20
+  description: Minimal web dashboard shows live item count, error count, active URL.
+- github_issue: 10
+  title: Prioritize Better Link Selectors Dynamically
+  priority: P2
+  size: L
+  sprint: Sprint 7
+  estimate_hours: 10
+  description: Spider ranks selector list by historical success %. Stores selector
+    stats.
+- github_issue: 9
+  title: Improve OpenAI Fallback Robustness
+  priority: P2
+  size: M
+  sprint: Sprint 2
+  estimate_hours: 10
+  description: Fallback activates only when no selectors return data. Handles OpenAI
+    errors gracefully.
+  status: closed
+- github_issue: 8
+  title: Tune Scoring Methods for Catalogue Detection
+  priority: P1
+  size: S
+  sprint: Sprint 2
+  estimate_hours: 6
+  description: Scoring parameters live in config and are adjustable. Values tuned
+    empirically.
+- github_issue: 7
+  title: Parallelize Table Parsing
+  priority: P2
+  size: M
+  sprint: Sprint 10
+  estimate_hours: 14
+  description: Parsing large <table> pages processed concurrently with proven speedup.
+- github_issue: 6
+  title: Add Data Validation Before Yielding Items
+  priority: P0
+  size: M
+  sprint: Sprint 1
+  estimate_hours: 12
+  description: Each item passes pydantic schema validation; invalid items are dropped.
+  status: closed
+- github_issue: 5
+  title: Filter Invalid Links Before Following
+  priority: P0
+  size: S
+  sprint: Sprint 1
+  estimate_hours: 4
+  description: Reject all specified bad patterns before link following. High coverage
+    required.
+  status: closed
+- github_issue: 4
+  title: Move Selectors to External Config (YAML/JSON)
+  priority: P1
+  size: M
+  sprint: Sprint 2
+  estimate_hours: 10
+  description: Selectors externalized into YAML/JSON config for flexible updates.
+- github_issue: 3
+  title: Add a Mock Mode for Local Testing
+  priority: P1
+  size: S
+  sprint: Sprint 1
+  estimate_hours: 5
+  description: MOCK_MODE=true env var makes crawler read HTML fixtures instead of
+    fetching live.
+  status: closed
+- github_issue: 2
+  title: Implement Retry Logic for Selenium and OpenAI calls
+  priority: P0
+  size: M
+  sprint: Sprint 2
+  estimate_hours: 10
+  description: Failed HTTP/Selenium/OpenAI requests are retried up to N times, exponential
+    back‑off. Final failure logged.
+- github_issue: 1
+  title: Decouple Selenium into a SeleniumManager class
+  priority: P1
+  size: M
+  sprint: Sprint 3
+  estimate_hours: 10
+  description: New utils/selenium_manager.py handles driver lifecycle; spider uses
+    it via DI.
+- github_issue: 98
+  title: Build Orchestrator Class
+  priority: P0
+  size: M
+  estimate_hours: 16
+  sprint: Sprint 9
+  description: Centralize response handling logic in a new Orchestrator class that coordinates classification, field extraction, validation, retry handling, and provenance logging. Refactors logic out of Spider to improve modularity.
+- github_issue: 99
+  title: Implement RedisStream-Based RequestScheduler
+  priority: P0
+  size: L
+  estimate_hours: 18
+  sprint: Sprint 9
+  description: Replace in-memory queues with a durable Redis Stream-based queue to allow for crawl checkpointing, requeue, and concurrent worker dispatch. Enables resilience and performance scalability.
+
+- github_issue: 100
+  title: Add Bloom Filter for URL Deduplication
+  priority: P1
+  size: S
+  estimate_hours: 8
+  sprint: Sprint 9
+  description: Prevent redundant crawl requests by tracking seen URLs using a probabilistic Bloom filter with a ~1% false-positive rate. Used by RequestScheduler.
+
+- github_issue: 101
+  title: Integrate Async Playwright Renderer Pool
+  priority: P0
+  size: M
+  estimate_hours: 14
+  sprint: Sprint 10
+  description: Replace per-request Selenium calls with a shared pool of Playwright browser contexts managed via an async semaphore. Site profiles define which domains use JS.
+
+- github_issue: 102
+  title: Implement MLPageClassifier with Rule Fallback
+  priority: P1
+  size: M
+  estimate_hours: 12
+  sprint: Sprint 10
+  description: Lightweight logistic regression classifier on TF-IDF or HTML features, with rule fallback for low confidence predictions. Embedded in Orchestrator.
+
+- github_issue: 103
+  title: Add SiteProfile Contract CI Validator
+  priority: P1
+  size: S
+  estimate_hours: 6
+  sprint: Sprint 10
+  description: Validate site profile YAMLs in CI against JSON schema and run basic fixture-based contract tests to ensure selector coverage.
+
+- github_issue: 104
+  title: Build SchemaRegistry for Multi-Type Output
+  priority: P1
+  size: M
+  estimate_hours: 10
+  sprint: Sprint 10
+  description: Unify and validate output schemas across multiple content types (film, game, tech). Supports dynamic validation and versioning in pipeline.
+
+- github_issue: 105
+  title: Implement EntityResolver with Trust Score Logic
+  priority: P0
+  size: M
+  estimate_hours: 16
+  sprint: Sprint 10
+  description: Merge duplicate film items across sources using fuzzy title/year match and apply weighted trust scores per source/site profile.
+
+- github_issue: 106
+  title: Build FilmAPI and SearchIndexer
+  priority: P1
+  size: L
+  estimate_hours: 18
+  sprint: Sprint 10
+  description: Provide RESTful read/search/update access to canonical records. Use Typesense or Tantivy for indexing. Enables public and editor access.
+
+- github_issue: 107
+  title: Build Editor Interface MVP
+  priority: P2
+  size: L
+  estimate_hours: 20
+  sprint: Backlog
+  description: Minimal frontend for viewing and editing film entries. Uses FilmAPI, supports enrichment_needed flag, and syncs via trust score logic.
+
+- github_issue: 108
+  title: Add Prometheus MetricsCollector Integration
+  priority: P1
+  size: S
+  estimate_hours: 6
+  sprint: Backlog
+  description: Expose metrics from FieldExtractor, Orchestrator, RendererPool, RetryQueue, and Scheduler to Prometheus. Add tags for domain and content_type.
+
+- github_issue: 109
+  title: Add PII Scrubber to Provenance Pipeline
+  priority: P2
+  size: S
+  estimate_hours: 8
+  sprint: Backlog
+  description: Use regex patterns to redact emails, phone numbers, and personal identifiers from stored HTML and field provenance data before saving.
+
+- github_issue: 110
+  title: Deploy Infrastructure Templates (Dev + Prod)
+  priority: P1
+  size: M
+  estimate_hours: 10
+  sprint: Backlog
+  description: Build Docker Compose stack for Dev (Redis, Postgres, Prometheus, Playwright, Grafana) and GitHub Actions for Prod deploy via Docker images.

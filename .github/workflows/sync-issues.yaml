@@ -1,13 +1,27 @@
 name: Sync Issues Between YAML and GitHub
 
 permissions:
-  contents: read
-  issues: write
+  contents: write  # Need write to update YAML file
+  issues: write    # Need write to update issues
+  project: write   # Need write to update project fields
 
 on:
+  # Run when issues are created or edited
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  
+  # Run when the YAML file is updated
   push:
     branches:
       - main  # Or your default branch
+    paths:
+      - 'docs/issues.yaml'  # Only run when the issues file changes
+  
+  # Run on schedule (daily at midnight UTC)
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+  
+  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
@@ -24,11 +38,28 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install PyYAML requests dotenv
+          python -m pip install --upgrade pip
+          pip install PyYAML requests python-dotenv gql rich
+
+      - name: Extract repository owner and name
+        id: repo-info
+        run: |
+          echo "REPO_OWNER=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 1)" >> $GITHUB_ENV
+          echo "REPO_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)" >> $GITHUB_ENV
 
       - name: Run issue sync
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_OWNER: ${{ env.REPO_OWNER }}
+          GITHUB_REPO: ${{ env.REPO_NAME }}
+          GITHUB_PROJECT_ID: ${{ secrets.GITHUB_PROJECT_ID }}
         run: |
-          python scripts/sync_issues.py --mode=sync
+          python scripts/sync_issues.py --mode=sync --debug
+
+      - name: Commit changes if any
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/issues.yaml
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto-sync issues from GitHub"
+          git push

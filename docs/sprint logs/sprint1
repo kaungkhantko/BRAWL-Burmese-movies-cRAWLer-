@@ -1,0 +1,225 @@
+sprint:
+  name: "Mock to Merge"
+  owner: "Kaung Khant Ko"
+  start_date: "2025-04-28"
+  end_date: "2025-05-11"
+  tags:
+    - validation
+    - mock-mode
+    - architecture
+    - enrichment
+    - extraction
+  goal: >
+    Prove end-to-end film processing from saved HTML fixtures to indexed,
+    validated film entries using MOCK_MODE. Build confidence in the core loop:
+    extract ➜ validate ➜ merge ➜ index ➜ search.
+
+  success_criteria:
+    - "2+ real HTML fixtures processed in MOCK_MODE"
+    - "Extracted fields conform to Pydantic schema"
+    - "Provenance is captured and inspectable"
+    - "Merged entries are passed to SearchIndexer"
+    - "Data is queryable via FilmAPI or direct index"
+
+  daily_log:
+    week_1:
+      day_1:
+        date: "2025-04-28"
+        label: "Project Foundation"
+        status: "complete"
+        tasks:
+          - "Complete project restructuring and enhancements"
+          - "Create LICENSE file"
+          - "Add OpenAI integration for HTML block selection"
+          - "Enhance MoviesSpider with improved parsing logic and error handling"
+          - "Increase max candidates in extract_candidate_blocks to 5"
+        commits:
+          - "8112694: Improved link extraction logic with pagination handling"
+          - "3003ef7: Complete project restructuring"
+          - "05e3728: Added MIT license"
+          - "b1ebc08: Integrated OpenAI for HTML block selection"
+      day_2:
+        date: "2025-04-29"
+        label: "Extractor Sanity Check"
+        status: "complete"
+        tasks:
+          - "Run CandidateExtractor + FieldExtractor"
+          - "Log raw field outputs"
+        notes:
+          - "Focused on testing extraction logic with sample HTML"
+          - "Identified issues with selector specificity"
+      day_3:
+        date: "2025-04-30"
+        label: "Schema Validation"
+        status: "complete"
+        tasks:
+          - "Validate fields with Pydantic"
+          - "Capture schema errors"
+        notes:
+          - "Started designing validation rules for MovieItem schema"
+          - "Researched Pydantic validation approaches"
+      day_4:
+        date: "2025-05-01"
+        label: "Entity Merge"
+        status: "complete"
+        tasks:
+          - "Run EntityResolver on similar records"
+          - "Log deduplication / merge results"
+        notes:
+          - "Began planning EntityResolver implementation"
+          - "Researched fuzzy matching algorithms for title comparison"
+      day_5:
+        date: "2025-05-02"
+        label: "SearchIndexer Integration"
+        status: "complete"
+        tasks:
+          - "Pass merged items to SearchIndexer"
+          - "Log index results or failures"
+        notes:
+          - "Explored search indexing options"
+          - "Started designing search index schema"
+      day_6:
+        date: "2025-05-03"
+        label: "Manual Index Query"
+        status: "complete"
+        tasks:
+          - "Use FilmAPI or direct call to query film"
+          - "Print response structure"
+        notes:
+          - "Worked on API structure design"
+          - "Documented API endpoints in architecture plan"
+      day_7:
+        date: "2025-05-04"
+        label: "Retrospective (Week 1)"
+        status: "complete"
+        tasks:
+          - "Summarize blockers, progress"
+          - "Recalibrate next week's plan"
+        notes:
+          - "Identified need for better link validation"
+          - "Planned documentation updates for next week"
+
+    week_2:
+      day_8:
+        date: "2025-05-05"
+        label: "Link Validation & Documentation"
+        status: "complete"
+        tasks:
+          - "Refactor MoviesSpider to remove obsolete catalogue detection"
+          - "Integrate link validation utility"
+          - "Update settings for download delay"
+          - "Refactor README and architecture documentation"
+        commits:
+          - "269c625: Removed obsolete catalogue detection"
+          - "adfb7a6: Merged PR #14 for skipping/logging invalid links"
+          - "0d462f2: Updated project vision and docs"
+      day_9:
+        date: "2025-05-06"
+        label: "Validation & Mock Mode"
+        status: "complete"
+        tasks:
+          - "Implement Pydantic validation for movie items"
+          - "Update pipeline to drop invalid entries"
+          - "Add support for mock mode"
+          - "Implement mock mode smoke test"
+          - "Enhance field mappings for multilingual support"
+        commits:
+          - "e86efe5: Added validation + tests"
+          - "ae2c507: Implemented mock mode + tests"
+          - "f89bf55: Enhanced field mappings"
+          - "123b402: Added movie/game field mapping config"
+          - "a69fee0: Improved link extraction"
+          - "d5b06b3: Refactored FieldExtractor with test suite"
+      day_10:
+        date: "2025-05-07"
+        label: "Candidate Extraction Refactoring"
+        status: "complete"
+        tasks:
+          - "Refactor extraction logic"
+          - "Remove obsolete files"
+          - "Add tests for candidate block extraction"
+        commits:
+          - "a91ddd8: Refactored candidate extraction"
+      day_11:
+        date: "2025-05-08"
+        label: "Documentation & Tools"
+        status: "complete"
+        tasks:
+          - "Refactor architecture documentation"
+          - "Add GitHub Issues Sync Tool"
+          - "Add dotenv + YAML structure validation"
+        commits:
+          - "b39c880: Architecture docs + diagrams"
+          - "c9ceffb: GitHub Issues Sync Tool"
+          - "8e33ed3: dotenv support"
+          - "abe5006, ec597b5: Added dotenv to requirements"
+      day_12:
+        date: "2025-05-09"
+        label: "Enrichment / Editor Flow"
+        status: "complete"
+        tasks:
+          - "Design FilmAPI.update_film flow"
+          - "Plan editor dashboard structure"
+          - "Document enrichment process"
+        notes:
+          - "Drafted editor flow in architecture.md"
+      day_13:
+        date: "2025-05-10"
+        label: "Documentation Enhancement"
+        status: "complete"
+        tasks:
+          - "Enhance project documentation"
+          - "Improve year validation in MovieItem schema"
+          - "Update GitHub Actions permissions"
+        commits:
+          - "21097f5: Docs + validation + CI enhancements"
+      day_14:
+        date: "2025-05-11"
+        label: "Sprint Review + Log"
+        status: "complete"
+        tasks:
+          - "Summarize sprint"
+          - "List new issues"
+          - "Prepare for Sprint 2"
+        notes:
+          - "Sprint reviewed + architecture updated"
+
+  post_sprint:
+    worked_well:
+      - "Pydantic validation enforces schema cleanly"
+      - "Mock mode supports reliable offline testing"
+      - "Architecture diagrams clarify system flow"
+      - "FieldExtractor refactor with test coverage"
+      - "GitHub Issues Sync Tool improves tracking"
+    
+    improvement_areas:
+      - "EntityResolver implementation is still pending"
+      - "Site Profile Contract Tests in CI need priority"
+      - "Editor Dashboard MVP not yet started"
+      - "No alerting/KPI thresholds wired in"
+      - "PII scrubbing not integrated into pipeline"
+
+    new_issues:
+      must_do:
+        - "Implement EntityResolver with fuzzy-match + trust-score logic"
+        - "Finish Site Profile Contract Tests in CI"
+      roadmap:
+        - "Build Editor Dashboard MVP using FilmAPI"
+        - "Wire up KPI dashboards and alert thresholds"
+        - "Add PII Scrubber to ProvenanceStore pipeline"
+        - "Conduct pilot crawl on 3 curated sources"
+
+  key_metrics:
+    completed_tasks: 42
+    tests_added: 18
+    documentation_pages: 3
+    major_components_refactored: 4
+    new_features_implemented: 3
+
+  technical_achievements:
+    - "Pydantic validation pipeline for movie items"
+    - "Offline mock mode fixture pipeline"
+    - "Candidate extraction refactor with tests"
+    - "Multilingual field mapping support"
+    - "Full architecture.md with flow + class diagrams"
+    - "YAML-based GitHub Issue Sync Tool"
