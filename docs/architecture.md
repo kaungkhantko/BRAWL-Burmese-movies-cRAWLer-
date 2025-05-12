@@ -425,35 +425,10 @@ classDiagram
 | `TrainingDataStore`  | Feedback / Learning      | Stores all human-labeled examples (correct and incorrect) for model retraining | Tracks label source, context, and extraction success                 |
 | `ClassifierUpdater`  | Learning                 | Periodically retrains and/or swaps in a new classifier using training data     | Can trigger fine-tuning or full model replacement                    |
 
----
-
-## 4 · Deployment & Operations
-
-| Environment    | Tech                                                                                       | Purpose                                         |
-| -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| **Dev (Mock)** | Docker Compose: Playwright, Redis, Postgres, Grafana; `MOCK_MODE=true`.                    | Deterministic local tests & CI.                 |
-| **Prod**       | Docker images on VPS or K8s `CronJob`; secrets via GitHub → K8s Secrets.                   | Weekly scheduled crawl; auto‑scaling if needed. |
-| Backups        | MinIO / S3 lifecycle rules (compress ≥30 d, delete ≥1 y).                                  | Controls raw‑HTML storage cost.                 |
-| CI/CD          | GitHub Actions: linters, site‑profile contract tests, mock smoke test, image build & push. | Fail‑fast guarantee.                            |
 
 ---
 
-## 5 · KPI Instrumentation & Observability
-
-All KPIs listed in the *Execution Map* are exported via **MetricsCollector** to Prometheus with labels `project="brawl"`, `content_type`, `domain`, etc. Example mappings:
-
-| KPI (Business)                | Prometheus Metric                     | Type    |
-| ----------------------------- | ------------------------------------- | ------- |
-| `metadata_certified_rate`     | `brawl_metadata_certified_ratio`      | Gauge   |
-| `weekly_title_only_additions` | `brawl_title_only_total{window="7d"}` | Counter |
-| `selenium_render_ratio`       | `brawl_selenium_render_ratio`         | Gauge   |
-| `retry_success_rate`          | `brawl_retry_success_ratio`           | Gauge   |
-
-Dashboards in Grafana surface **trend lines** and **alert rules** (e.g., validation grade < 90% triggers Opsgenie).
-
----
-
-## 6 · Next Steps
+## 4 · Next Steps
 
 1. **Implement EntityResolver** with fuzzy‑match + trust‑score logic.
 2. **Finish Site Profile Contract Tests** in CI.
