@@ -167,7 +167,92 @@ flowchart TD
 6. **Human‑in‑the‑loop** — editor dashboard + enrichment tags.
 7. **CI Enforced** — site‑profile contract tests & mock‑mode smoke tests in GitHub Actions.
 
-### 3.2 Class Diagram
+### 3.2 Flow Diagram
+
+```mermaid
+flowchart TD
+ subgraph Fetch["Fetch"]
+        RequestQueue
+        SeedSources
+        SeenCheck
+        RenderCheck
+        PageRenderer
+        SimpleFetcher
+        ResponseRouter
+        ErrorHandler
+        SkipCheck
+        SkipLogger
+        PageClassifier
+  end
+ subgraph Classification["Classification"]
+        ClassifierLogger
+        CatalogueExtractor
+        DetailExtractor
+        FallbackExtractor
+        AuditLogger
+        IrrelevantFilter
+  end
+ subgraph Processing["Processing"]
+        ValidationCheck
+        CanonicalUpdater
+        RetryGate
+        DeadLetterQueue
+  end
+ subgraph Storage["Storage"]
+        ProvenanceTracker
+        SearchIndexer
+        FilmSearch
+  end
+ subgraph Observability["Observability"]
+        MetricsLogger
+        MonitoringUI
+  end
+ subgraph Feedback["Feedback"]
+        FilmUpdater
+        AuditUI
+        ManualReclassifier
+        ManualAuditLogger
+  end
+    SeedSources --> RequestQueue
+    RequestQueue --> SeenCheck & MetricsLogger
+    SeenCheck -- yes --> RequestQueue
+    SeenCheck -- no --> RenderCheck
+    RenderCheck -- yes --> PageRenderer
+    RenderCheck -- no --> SimpleFetcher
+    PageRenderer -- success --> ResponseRouter
+    SimpleFetcher --> ResponseRouter
+    PageRenderer -- fail --> ErrorHandler
+    ResponseRouter --> SkipCheck
+    SkipCheck -- yes --> SkipLogger
+    SkipCheck -- no --> PageClassifier
+    PageClassifier --> ClassifierLogger
+    PageClassifier -- catalogue --> CatalogueExtractor
+    PageClassifier -- detail --> DetailExtractor
+    PageClassifier -- unknown --> FallbackExtractor & AuditLogger
+    PageClassifier -- irrelevant --> IrrelevantFilter
+    CatalogueExtractor --> RequestQueue
+    DetailExtractor --> ValidationCheck
+    FallbackExtractor --> ValidationCheck
+    ValidationCheck -- pass --> CanonicalUpdater
+    ValidationCheck -- fail --> RetryGate
+    RetryGate -- yes --> RequestQueue
+    RetryGate -- no --> DeadLetterQueue
+    CanonicalUpdater --> ProvenanceTracker & SearchIndexer
+    SearchIndexer --> FilmSearch
+    ClassifierLogger --> MetricsLogger
+    SkipLogger --> MetricsLogger
+    ValidationCheck --> MetricsLogger
+    ErrorHandler --> MetricsLogger
+    MetricsLogger --> MonitoringUI
+    AuditUI --> FilmUpdater & ManualReclassifier
+    FilmUpdater --> CanonicalUpdater
+    ManualReclassifier -- catalogue --> CatalogueExtractor
+    ManualReclassifier -- detail --> DetailExtractor
+    ManualReclassifier -- unknown --> FallbackExtractor
+    ManualReclassifier --> ManualAuditLogger
+```
+
+### 3.3 Class Diagram
 ```mermaid
 classDiagram
     %% ─────────── Crawl Control ───────────
@@ -187,7 +272,6 @@ classDiagram
     }
     class RendererPool {
         +render(url): Response
-        note "Playwright; pool_size=4" as N1
     }
     class CheckpointStore {
         +save()
@@ -210,8 +294,8 @@ classDiagram
     class FieldExtractor {
         +extract(resp, profile): dict
     }
-    class EntityResolver {
-        +merge(item): CanonicalItem
+    class ManualReclassifier {
+        +route(label, resp): ExtractResult
     }
 
     %% ─────────── Validation & Storage ───────────
@@ -233,8 +317,16 @@ classDiagram
     class SchemaRegistry {
         +get_schema(content_type)
     }
+    class SkipHandler {
+        +should_skip(resp): bool
+        +log(resp)
+    }
 
     %% ─────────── Indexing & API ───────────
+    class EntityResolver {
+        +merge(item): CanonicalItem
+        +create(item): CanonicalItem
+    }
     class SearchIndexer {
         +update_index(item)
         +query_index(params): list
@@ -251,6 +343,19 @@ classDiagram
         +edit_film(id)
     }
 
+    %% ─────────── Feedback & Learning ───────────
+    class AuditLogger {
+        +log(source, label, context)
+    }
+    class TrainingDataStore {
+        +append(label, html, metadata)
+        +sample(n): list
+    }
+    class ClassifierUpdater {
+        +train(data)
+        +update_model()
+    }
+
     %% ─────────── Relationships ───────────
     CrawlManager --> RequestScheduler
     RequestScheduler --> BloomDeduplicator
@@ -265,7 +370,12 @@ classDiagram
     Orchestrator --> DataQualityMonitor
     Orchestrator --> ProvenanceStore
     Orchestrator --> EntityResolver
+    Orchestrator --> SkipHandler
     Orchestrator ..> RetryQueue : on failure
+    Orchestrator --> AuditLogger
+
+    ManualReclassifier --> AuditLogger
+    ManualReclassifier --> FieldExtractor
 
     DataQualityMonitor --> MetricsCollector
     ProvenanceStore --> SearchIndexer : log source
@@ -274,67 +384,46 @@ classDiagram
     EditorInterface --> FilmAPI : PATCH/edit
     FilmAPI --> EntityResolver : update enrichment
     SchemaRegistry <.. FieldExtractor
+
+    AuditLogger --> TrainingDataStore
+    TrainingDataStore --> ClassifierUpdater
+    ClassifierUpdater --> MLPageClassifier
 ```
 
-### 3.3 Flow Diagram
+### 3.4 Component Glossary
 
-```mermaid
-flowchart TD
-    subgraph Crawl
-        A0[Seed URLs / SourceDiscovery] --> A1[RequestScheduler]
-    end
-    A1 --> A2{Duplicate?}
-    A2 -- yes --> A1
-    A2 -- no --> A3{JS Needed?}
-    A3 -- yes --> A4[RendererPool.render]
-    A3 -- no --> A5[Scrapy fetch]
-    A4 --> A6[Orchestrator.handle]
-    A5 --> A6
-
-    A6 --> B1[MLPageClassifier]
-    B1 -->|catalogue| B2[Extract Links] --> A1
-    B1 -->|detail| B3[Extract Fields] --> C1[DataQualityMonitor]
-    B1 -->|unknown| B4[CandidateExtractor ➜ FieldExtractor] --> C1
-
-    C1 -->|pass| D1[EntityResolver.merge]
-    C1 -->|fail| A1
-    C1 --> F1[MetricsCollector]
-    A6 --> F1
-    A1 --> F1
-
-    D1 --> E1[ProvenanceStore.save]
-    D1 --> E2[SearchIndexer.update_index]
-
-    E2 --> G1[FilmAPI.query/search]
-
-    subgraph Enrichment
-        G2[EditorInterface] --> G3[FilmAPI.update_film]
-        %% merge updates into canonical items
-        G3 --> D1
-    end
-
-```
-
-### 3.4 Component Glossary (Key Points Only)
-
-| Component              | Responsibility                                                                                         | Notes & KPIs                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| **CrawlManager**       | CLI entrypoint; loads checkpoints; supervises workers.                                                 | Emits `crawl_sessions_total`.                        |
-| **RequestScheduler**   | Pulls next URL from Redis Stream; consults Bloom filter; decides JS vs HTML.                           | Tracks `queue_length` & `avg_wait_sec`.              |
-| **BloomDeduplicator**  | Global seen‑URL filter (\~1% fp).                                                                      | Supports *Breadth over Depth* strategy.              |
-| **RendererPool**       | Playwright pool; headless Chrome; back‑pressure handled via async semaphore.                           | KPIs: `selenium_render_ratio`, `avg_render_time`.    |
-| **MLPageClassifier**   | Logistic Reg with TF‑IDF; returns `(type, confidence)`. Falls back to rule heuristics if `conf < 0.6`. | KPI: `classifier_confidence_avg`.                    |
-| **SiteProfileManager** | YAML per domain: selectors, JS flag, throttle. CI validates schema.                                    | KPI: `profile_contract_failures`.                    |
-| **CandidateExtractor** | Fast regex/text heuristics for unknown pages.                                                          | KPI: `candidate_extractor_hit_rate`.                 |
-| **FieldExtractor**     | Maps raw HTML → dict using profile selectors + fallback fuzzy.                                         | Schema‑aware via **SchemaRegistry**.                 |
-| **EntityResolver**     | Merges items across sources by title/year (fuzzy) and priority score.                                  | KPIs: `merged_entry_rate`, `avg_sources_per_film`.   |
-| **DataQualityMonitor** | Validates required fields, year range, null %. Assigns grade A‑F.                                      | KPIs: `validation_fail_total`, `grade_distribution`. |
-| **ProvenanceStore**    | Saves canonical JSON + per‑field source + HTML hash.                                                   | Enables editor audit trail.                          |
-| **RetryQueue**         | Redis sorted set; stores URL, retry\_count, last\_error.                                               | KPIs: `retry_success_rate`, `dead_letter_total`.     |
-| **MetricsCollector**   | Prometheus bridge; records all KPIs.                                                                   |                                                      |
-| **FilmAPI**            | REST `GET /films`, `PATCH /films/:id` (auth required).                                                 | KPI: `film_lookup_response_ms`, `api_uptime`.        |
-| **SearchIndexer**      | Typesense or Tantivy; drives frontend search.                                                          | KPI: `index_sync_lag_sec`.                           |
-| **SchemaRegistry**     | YAML/JSON Schema per content type (film/game/tech).                                                    | KPI: `schema_validation_errors`.                     |
+| **Component**        | **Type**                 | **Purpose / Responsibility**                                                   | **Notes**                                                            |
+| -------------------- | ------------------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `SeedSources`        | Fetch                    | Generates the initial seed URLs or discovers new sources to crawl              | Can be hardcoded, sitemap-based, or learned dynamically              |
+| `RequestQueue`       | Fetch                    | Manages the queue of pending crawl URLs, ensuring correct scheduling           | Should support priority, deduplication, and checkpointing            |
+| `SeenCheck`          | Fetch                    | Checks if a URL has already been crawled                                       | Typically uses a Bloom filter or persistent store                    |
+| `RenderCheck`        | Fetch                    | Determines if a page requires JavaScript rendering                             | Rules-based, may evolve to ML-based heuristics                       |
+| `PageRenderer`       | Fetch                    | Uses a headless browser (e.g., Playwright) to render JS-heavy pages            | Includes resource blocking, timeout, and concurrency control         |
+| `SimpleFetcher`      | Fetch                    | Fetches static HTML pages via lightweight requests (e.g., Scrapy)              | Used when JS is unnecessary                                          |
+| `ResponseRouter`     | Fetch                    | Routes rendered/fetched page to downstream logic                               | Handles errors, MIME type checks, and retry classification           |
+| `SkipCheck`          | Fetch                    | Filters pages that are empty, redirect, 404, etc.                              | Essential to avoid wasted computation                                |
+| `SkipLogger`         | Observability            | Logs skipped or invalid pages for diagnostics                                  | Useful for debugging misrouted or filtered pages                     |
+| `PageClassifier`     | Classification           | Predicts page type: `catalogue`, `detail`, `irrelevant`, `unknown`             | ML model trained on prior page features and labels                   |
+| `ClassifierLogger`   | Observability            | Logs classifier outputs including prediction, confidence, and features         | Enables audit trails, model monitoring, and drift detection          |
+| `CatalogueExtractor` | Classification           | Extracts links to individual movie pages from catalogue-type pages             | Must be robust to noisy, inconsistent layouts                        |
+| `DetailExtractor`    | Classification           | Extracts structured film metadata from detail pages (e.g., title, year)        | Relies on field mappings or model-based extractors                   |
+| `FallbackExtractor`  | Classification           | Applies heuristics to extract metadata from unknown/unlabeled pages            | Used when classifier is uncertain or wrong                           |
+| `AuditLogger`        | Feedback / Observability | Logs all classifier errors and human-labeled overrides                         | Feeds into `TrainingDataStore` for system improvement                |
+| `IrrelevantFilter`   | Classification           | Silently drops non-film pages (e.g., login, ads, legal)                        | Critical for efficiency                                              |
+| `ValidationCheck`    | Processing               | Validates extracted metadata (e.g., type checks, required fields)              | Uses Pydantic or schema validation                                   |
+| `RetryGate`          | Processing               | Determines whether a failed item should be retried or dropped                  | May track retry counts in Redis or DB                                |
+| `DeadLetterQueue`    | Processing               | Stores permanently failed extractions for manual analysis                      | Enables recovery, audit, and future retraining                       |
+| `CanonicalUpdater`   | Processing               | Merges valid film data into existing canonical entries or creates new ones     | Ensures film identity resolution and deduplication                   |
+| `ProvenanceTracker`  | Storage                  | Records where and how data was obtained (URL, HTML hash, classifier version)   | Useful for trust, debugging, and reprocessing                        |
+| `SearchIndexer`      | Storage                  | Indexes canonical film records for fast query and search (e.g., ElasticSearch) | Supports frontend or API search                                      |
+| `FilmSearch`         | Storage                  | API endpoint or module to retrieve indexed film data                           | Powers public or internal search UIs                                 |
+| `MetricsLogger`      | Observability            | Central emitter of metrics from crawl, classification, extraction              | Events include `url_scheduled`, `classifier_miss`, `validation_fail` |
+| `MonitoringUI`       | Observability            | Dashboard that visualizes system health and metrics                            | Supports Prometheus, Grafana, or custom stack                        |
+| `AuditUI`            | Feedback                 | UI for human reviewers to inspect, validate, and reclassify unknown pages      | Supports page labeling, inline extraction, bulk decisions            |
+| `ManualReclassifier` | Feedback                 | Takes human input and routes a page to the appropriate extractor               | Replaces or overrides classifier logic                               |
+| `FilmUpdater`        | Feedback                 | Lets users modify canonical film data manually                                 | Useful for error corrections and overrides                           |
+| `TrainingDataStore`  | Feedback / Learning      | Stores all human-labeled examples (correct and incorrect) for model retraining | Tracks label source, context, and extraction success                 |
+| `ClassifierUpdater`  | Learning                 | Periodically retrains and/or swaps in a new classifier using training data     | Can trigger fine-tuning or full model replacement                    |
 
 ---
 
