@@ -2,7 +2,7 @@
 
 from scrapy.http import HtmlResponse
 from burmese_movies_crawler.utils.page_classifier import PageClassifier
-from burmese_movies_crawler.utils.field_extractor import FieldExtractor
+from burmese_movies_crawler.extractors.engine import ExtractorEngine
 from burmese_movies_crawler.utils.candidate_extractor import extract_candidate_blocks
 from burmese_movies_crawler.utils.trafilatura_selectorr import pick_movie_block_with_trafilatura
 import logging
@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 def handle_page(html: str, url: str,
                 classifier: PageClassifier,
-                extractor: FieldExtractor,
+                extractor: ExtractorEngine,
                 content_type: str = "movies") -> dict:
 
     response = HtmlResponse(url=url, body=html, encoding='utf-8')

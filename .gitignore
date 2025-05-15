@@ -32,3 +32,4 @@ Thumbs.db
 *.sublime-workspace
 
 logs/
+chat_logs/

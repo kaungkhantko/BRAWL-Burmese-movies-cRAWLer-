@@ -10,34 +10,53 @@ from burmese_movies_crawler.utils.link_utils import (
     evaluate_catalogue_rules,
     compute_catalogue_score)
 from scrapy.http import HtmlResponse
+from urllib.parse import urldefrag, urljoin
 
-@pytest.mark.parametrize("url", [
-    "https://example.com",
-    "/relative/path",
-    "./about",
-    "../movies",
-    "https://example.com#section",
-    "https://example.com/search?q=test",
-    "   https://example.com/page   "
+@pytest.mark.parametrize("raw_url, base_url", [
+    # Absolute URLs (should pass)
+    ("https://example.com", "https://example.com"),
+    ("https://example.com/search?q=test", "https://example.com"),
+
+    # Fragment should be stripped but still valid
+    ("https://example.com#section", "https://example.com"),
+
+    # Whitespace should be stripped and accepted
+    ("   https://example.com/page   ", "https://example.com"),
+
+    # Valid relative URLs (should pass after urljoin)
+    ("/relative/path", "https://example.com"),
+    ("./about", "https://example.com/movies"),
+    ("../movies", "https://example.com/films/page")
 ])
-def test_valid_links(url):
-    assert is_valid_link(url) is True
+def test_valid_links(raw_url, base_url):
+    """
+    Ensure valid absolute and relative URLs are accepted
+    after normalization and defragmentation.
+    """
+    invalid_log = []
+
+    # Simulate normalization as done in extract_links()
+    resolved = urljoin(base_url, raw_url.strip())
+    clean = urldefrag(resolved)[0]
+
+    assert is_valid_link(clean, invalid_log) is True
+    assert not invalid_log  # Nothing should be logged
 
 @pytest.mark.parametrize("url, reason", [
-    ("", "Empty URL"),
-    ("#", "Placeholder or fragment"),
-    ("void(0)", "Placeholder or fragment"),
-    ("none", "Placeholder or fragment"),
+    ("", "Empty or None"),
+    ("#", "Fragment-only link"),
+    ("void(0)", "Empty or None"),
+    ("none", "Empty or None"),
     ("javascript:void(0)", "Non-crawlable scheme"),
     ("mailto:someone@example.com", "Non-crawlable scheme"),
     ("tel:123456789", "Non-crawlable scheme"),
-    ("ftp://example.com", "Unsupported URL format"),
-    ("data:text/html;base64,xyz", "Unsupported URL format"),
-    ("http:/", "Unsupported URL format"),
-    (":", "Unsupported URL format"),
+    ("ftp://example.com", "Unsupported or malformed URL format"),
+    ("data:text/html;base64,xyz", "Unsupported or malformed URL format"),
+    ("http:/", "Unsupported or malformed URL format"),
+    (":", "Unsupported or malformed URL format"),
     ("JavaScript:void(0)", "Non-crawlable scheme"),
     ("MAILTO:user@example.com", "Non-crawlable scheme"),
-    ("//example.com", "Protocol-relative URL")
+    ("//example.com", "Unsupported or malformed URL format")
 ])
 def test_invalid_links(url, reason):
     log = []

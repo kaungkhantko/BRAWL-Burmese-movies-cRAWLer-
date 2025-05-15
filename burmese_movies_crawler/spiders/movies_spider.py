@@ -16,7 +16,7 @@ from burmese_movies_crawler.utils.link_utils import (
 )
 from burmese_movies_crawler.utils.selenium_manager import SeleniumManager
 from burmese_movies_crawler.utils.page_classifier import PageClassifier
-from burmese_movies_crawler.utils.field_extractor import FieldExtractor
+from burmese_movies_crawler.factory import create_extractor_engine
 from burmese_movies_crawler.utils.orchestrator import handle_page
 from burmese_movies_crawler.utils.link_utils import get_response_or_request
 from burmese_movies_crawler.settings import MOCK_MODE
@@ -75,7 +75,7 @@ class MoviesSpider(scrapy.Spider):
         ]
 
         self.classifier = PageClassifier(self.DEFAULT_RULE_THRESHOLDS, self.CATALOGUE_RULES)
-        self.extractor = FieldExtractor(content_type='movies', invalid_links=self.invalid_links)
+        self.extractor = create_extractor_engine(content_type='movies', invalid_links=self.invalid_links)
 
     def _setup_paths(self):
         timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))

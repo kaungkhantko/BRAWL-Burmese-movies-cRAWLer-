@@ -9,16 +9,18 @@ logger = logging.getLogger(__name__)
 import scrapy
 import os
 
+from urllib.parse import urlparse
+
 def is_valid_link(url, invalid_links_log=None):
     """
-    Check if the given URL is valid for crawling.
+    Centralized validation for link filtering and logging.
 
     Parameters:
-    - url (str): The URL to validate.
+    - url (str): The fully resolved URL (after urljoin and urldefrag).
     - invalid_links_log (list): Optional list to append (reason, url) for invalid entries.
 
     Returns:
-    - bool: True if the URL is valid, False otherwise.
+    - bool: True if the URL is valid for crawling.
     """
     def log(reason):
         if invalid_links_log is not None:
@@ -28,36 +30,34 @@ def is_valid_link(url, invalid_links_log=None):
         log("Non-string input")
         return False
 
-    if not url:
-        log("Empty URL")
+    url = url.strip()
+    url_lower = url.lower()
+
+    # Reject obvious garbage or placeholders
+    if url_lower in ("", "none", "void(0)"):
+        log("Empty or None")
+        return False
+    if url_lower.startswith('#'):
+        log("Fragment-only link")
         return False
 
-    url_normalized = url.strip().lower()
-
-    if url_normalized.startswith(('javascript:', 'mailto:', 'tel:')):
+    # Reject known non-crawlable schemes
+    if url_lower.startswith(('javascript:', 'mailto:', 'tel:')):
         log("Non-crawlable scheme")
         return False
 
-    if url_normalized in ['#', 'void(0)', 'none', '']:
-        log("Placeholder or fragment")
-        return False
+    parsed = urlparse(url)
 
-    if url_normalized.startswith('//'):
-        log("Protocol-relative URL")
-        return False
+    # Allow valid absolute http/https URLs
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return True
 
-    parsed = urlparse(url_normalized)
+    # Accept clean relative URLs (must look like real paths)
+    if not parsed.scheme and parsed.path and parsed.path.startswith(("/", "./", "../")):
+        return True
 
-    if not (
-        url_normalized.startswith('/') or
-        url_normalized.startswith('./') or
-        url_normalized.startswith('../') or
-        (parsed.scheme in ('http', 'https') and parsed.netloc)
-    ):
-        log("Unsupported URL format")
-        return False
-
-    return True
+    log("Unsupported or malformed URL format")
+    return False
 
 def extract_page_stats(response):
     """Count basic elements on the page for classification."""
