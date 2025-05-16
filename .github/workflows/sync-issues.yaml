@@ -46,10 +46,10 @@ jobs:
 
       - name: Run issue sync
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_OWNER: ${{ env.REPO_OWNER }}
-          GITHUB_REPO: ${{ env.REPO_NAME }}
-          GITHUB_PROJECT_ID: ${{ secrets.GITHUB_PROJECT_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ env.REPO_OWNER }}
+          REPO_NAME: ${{ env.REPO_NAME }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
         run: |
           python scripts/sync_issues.py --mode=sync --debug
 

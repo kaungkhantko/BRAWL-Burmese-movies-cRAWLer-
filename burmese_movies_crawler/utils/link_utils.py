@@ -42,7 +42,7 @@ def is_valid_link(url, invalid_links_log=None):
         return False
     
     # Reject fragment-only links or base URLs without paths
-    if url_lower.startswith('#') or (parsed.scheme and parsed.netloc and not parsed.path or parsed.path == '/'):
+    if url_lower.startswith('#') or (parsed.scheme in ('http', 'https') and parsed.netloc and (not parsed.path or parsed.path == '/')):
         log("Fragment-only link or base URL")
         return False
 
@@ -86,7 +86,7 @@ def rule_text_heavy(stats, thresholds):
 
 def rule_table_catalogue(response, stats, thresholds):
     if stats['tables'] >= 1:
-        rows = response.css('table tbody tr')
+        rows = response.css('table tbody tr') or response.css('table tr')
         return len(rows) >= thresholds['table_min_rows']
     return False
 

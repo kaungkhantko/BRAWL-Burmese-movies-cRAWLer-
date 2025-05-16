@@ -26,10 +26,10 @@ load_dotenv()
 
 # Configuration
 YAML_PATH = "docs/issues.yaml"
-REPO_OWNER = os.environ.get("GITHUB_OWNER", "")
-REPO_NAME = os.environ.get("GITHUB_REPO", "")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_PROJECT_ID = os.environ.get("GITHUB_PROJECT_ID", "")
+REPO_OWNER = os.environ.get("REPO_OWNER", "")
+REPO_NAME = os.environ.get("REPO_NAME", "")
+GITHUB_TOKEN = os.environ.get("GH_TOKEN", "")
+GITHUB_PROJECT_ID = os.environ.get("PROJECT_ID", "")
 API_BASE = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
 ISSUES_ENDPOINT = f"{API_BASE}/issues"
 
@@ -730,8 +730,8 @@ def main():
         
     # Check required environment variables
     if not all([GITHUB_TOKEN, GITHUB_PROJECT_ID, REPO_OWNER, REPO_NAME]):
-        print("Missing environment variables. Set GITHUB_TOKEN, GITHUB_PROJECT_ID, GITHUB_OWNER, and GITHUB_REPO.")
-        print("You can also use --project-id to override the GITHUB_PROJECT_ID environment variable.")
+        print("Missing environment variables. Set GH_TOKEN, PROJECT_ID, REPO_OWNER, and REPO_NAME.")
+        print("You can also use --project-id to override the PROJECT_ID environment variable.")
         sys.exit(1)
 
     # Load issues from YAML
