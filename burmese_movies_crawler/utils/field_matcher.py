@@ -51,9 +51,10 @@ class FieldMatcher:
                 return self._field_match_cache[text_lower]
                 
             best_field, best_score = None, 0
+            field_patterns = self.field_mapper.get_field_patterns()
             
             # Use pre-computed field patterns for faster matching
-            for field, pattern in self.field_mapper.get_field_patterns().items():
+            for field, pattern in field_patterns.items():
                 try:
                     labels = pattern.get('labels', [])
                     if not labels:
@@ -62,11 +63,11 @@ class FieldMatcher:
                     match, match_score = process.extractOne(text_lower, labels)
                     threshold = pattern.get('threshold', 70)
                     
-                    if match_score > best_score and match_score >= threshold:
+                    if match_score >= threshold and match_score > best_score:
                         best_field, best_score = field, match_score
                 except Exception as e:
                     logger.warning(f"Error matching field '{field}': {str(e)}")
-                    # Continue with next field
+                    raise ProcessingError(f"Failed to match field '{field}': {str(e)}") from e
                     
             # Cache the result
             self._field_match_cache[text_lower] = (best_field, best_score)

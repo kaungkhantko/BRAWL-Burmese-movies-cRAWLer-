@@ -91,40 +91,53 @@ class MainFieldExtractor:
             if not selectors:
                 logger.warning("No selectors provided")
                 return None
-                
-            # Create a combined selector for more efficient querying
-            if len(selectors) > 1:
-                try:
-                    combined_selector = ', '.join(selectors)
-                    matches = response.css(combined_selector)
-                    if matches:
-                        value = matches.get()
-                        if value:
-                            return self.text_cleaner.clean(value)
-                except Exception as e:
-                    logger.warning(f"Error with combined selector: {str(e)}")
-                    # Fall through to individual selectors
             
-            # If combined selector didn't work, try individual selectors
-            # This is a fallback for complex selectors that can't be combined
+            # Try each selector individually
             for sel in selectors:
                 try:
-                    matches = response.css(sel)
-                    if matches:
-                        value = matches.get()
-                        if value:
+                    # Handle text extraction for nested elements
+                    if "::text" not in sel and "::attr" not in sel:
+                        # For selectors without ::text, add it to get direct text
+                        direct_text_sel = f"{sel}::text"
+                        value = response.css(direct_text_sel).get()
+                        if value and value.strip():
                             return self.text_cleaner.clean(value)
-                        
-                        # Fallback: get text content even if it's nested inside
-                        try:
-                            nested_text = matches.xpath('string()').get()
-                            if nested_text and nested_text.strip():
-                                return self.text_cleaner.clean(nested_text)
-                        except Exception as e:
-                            logger.warning(f"Error getting nested text for selector '{sel}': {str(e)}")
+                            
+                        # If no direct text, try to get text from nested elements
+                        element_sel = sel
+                        nested_text = response.css(f"{element_sel} *::text").get()
+                        if nested_text and nested_text.strip():
+                            return self.text_cleaner.clean(nested_text)
+                    else:
+                        # For selectors with ::text or ::attr, use as is
+                        value = response.css(sel).get()
+                        if value and (isinstance(value, str) and value.strip()):
+                            return self.text_cleaner.clean(value)
+                            
                 except Exception as e:
                     logger.warning(f"Error with selector '{sel}': {str(e)}")
                     # Continue with next selector
+            
+            # If we get here, try one more approach with XPath for nested content
+            for sel in selectors:
+                try:
+                    # Extract the base selector without ::text or ::attr
+                    base_sel = sel.split("::")[0] if "::" in sel else sel
+                    
+                    # Use XPath to get all text nodes
+                    xpath_result = response.css(base_sel).xpath("string()").get()
+                    if xpath_result and xpath_result.strip():
+                        return self.text_cleaner.clean(xpath_result)
+                except Exception as e:
+                    logger.warning(f"Error with XPath fallback for '{sel}': {str(e)}")
+            
+            return None
+            
+        except Exception as e:
+            if not isinstance(e, ExtractionError):
+                logger.error(f"Extract field value error: {str(e)}")
+                raise ExtractionError(f"Failed to extract field value: {str(e)}")
+            raise
             
             return None
             

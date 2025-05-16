@@ -52,9 +52,27 @@ class ParagraphExtractor:
             data: Dict[str, str] = {}
             used: Set[str] = set()
             
+            # We need to ensure that CSS errors are properly propagated
+            # while still handling other types of errors gracefully
             try:
-                # Get all paragraphs at once
-                paragraphs = response.css('div.entry-content p::text').getall()
+                paragraphs = []
+                
+                # First attempt to get direct text content
+                paragraphs.extend(response.css('div.entry-content p::text').getall() or [])
+                
+                # Then try to get full paragraph content for paragraphs with HTML entities
+                p_elements = response.css('div.entry-content p')
+                if hasattr(p_elements, '__iter__'):  # Check if iterable
+                    for p in p_elements:
+                        try:
+                            text = ''.join(p.css('::text').getall()).strip()
+                            if text:  # Only add non-empty paragraphs
+                                paragraphs.append(text)
+                        except Exception as e:
+                            # Skip problematic paragraphs but log the error
+                            logger.warning(f"Error processing paragraph: {str(e)}")
+                            continue
+                            
             except Exception as e:
                 logger.error(f"Failed to extract paragraphs: {str(e)}")
                 raise ExtractionError(f"Failed to extract paragraphs: {str(e)}") from e

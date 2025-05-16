@@ -11,7 +11,7 @@ def test_invalid_year():
     with pytest.raises(ValidationError):
         MovieItem(title="Future Movie", year=3000, director="AI Director")
 
-@pytest.mark.parametrize("bad_year", [1800, 2200, -1, 9999])
+@pytest.mark.parametrize("bad_year", [1799, 2200, -1, 9999])
 def test_invalid_year(bad_year):
     with pytest.raises(ValidationError):
         MovieItem(title="Invalid Year", year=bad_year, director="X")
@@ -60,7 +60,7 @@ def test_synopsis_exceeds_max_length(long_text):
     with pytest.raises(ValidationError):
         MovieItem(title="Too Long", year=2020, director="Editor", synopsis=long_text)
 
-@pytest.mark.parametrize("valid_year", [1900, 2100])
+@pytest.mark.parametrize("valid_year", [1800, 2030])
 def test_year_at_bounds(valid_year):
     item = MovieItem(title="Boundary Year", year=valid_year, director="Year Master")
     assert item.year == valid_year

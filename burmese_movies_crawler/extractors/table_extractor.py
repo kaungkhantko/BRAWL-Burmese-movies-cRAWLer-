@@ -46,10 +46,13 @@ class TableExtractor:
                 raise TableProcessingError("No response or table object provided")
                 
             # Extract headers once and validate
+            headers = []
             try:
+                # First try to get headers from thead
                 headers = [h.strip() for h in table.css('thead th::text, thead td::text').getall()]
+                
+                # If no headers found, try the first row
                 if not headers:
-                    # Fallback if <thead> is missing
                     headers = [h.strip() for h in table.css('tr:first-child th::text, tr:first-child td::text').getall()]
             except Exception as e:
                 logger.error(f"Failed to extract table headers: {str(e)}")
@@ -66,20 +69,32 @@ class TableExtractor:
                 logger.error(f"Failed to map headers: {str(e)}")
                 raise TableProcessingError(f"Failed to map headers: {str(e)}") from e
             
-            # Process rows in batches
+            # Process rows
             try:
+                # First try tbody rows
                 rows = table.css('tbody tr')
+                
+                # If no tbody or no rows in tbody, try all rows except the first one (which contains headers)
+                if not rows:
+                    all_rows = table.css('tr')
+                    if len(all_rows) > 1:  # Skip the header row
+                        rows = all_rows[1:]
             except Exception as e:
                 logger.error(f"Failed to get table rows: {str(e)}")
                 raise TableProcessingError(f"Failed to get table rows: {str(e)}") from e
             
             for row in rows:
                 try:
-                    cells = [c.strip() for c in row.css('td::text, td *::text').getall() if c.strip()]
+                    # Get all text from cells, including nested elements
+                    cell_texts = []
+                    for i, cell in enumerate(row.css('td')):
+                        # Get all text from this cell
+                        cell_text = ' '.join([t.strip() for t in cell.css('::text').getall() if t.strip()])
+                        cell_texts.append(cell_text)
                     
                     # Handle partial matches gracefully
-                    if cells:
-                        item = self._create_item(cells, headers, header_map)
+                    if any(cell_texts):  # At least one cell has content
+                        item = self._create_item(cell_texts, headers, header_map)
                         if any(item.values()):
                             yield item
                             self.items_scraped += 1
@@ -111,7 +126,7 @@ class TableExtractor:
         for i, value in enumerate(cells):
             if i < len(headers):
                 field = header_map.get(headers[i])
-                if field:
+                if field and field in item.fields and value.strip():  # Check if field exists in item and value is not empty
                     item[field] = value
         
         return item

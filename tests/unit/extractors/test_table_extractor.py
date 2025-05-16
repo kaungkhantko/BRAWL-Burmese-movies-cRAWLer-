@@ -220,10 +220,16 @@ def test_extract_with_cell_processing_error(extractor):
             if "thead" in selector:
                 class HeaderResult:
                     def getall(self):
-                        return ["Header1", "Header2"]
+                        return ["Title", "Year"]
                 return HeaderResult()
             elif "tbody tr" in selector:
                 return [MagicMock()]  # Return a mock row
+            elif "tr:first-child" in selector:
+                # Return empty for the fallback header selector
+                class EmptyResult:
+                    def getall(self):
+                        return []
+                return EmptyResult()
             return []
     
     # Create a mock row that raises an exception when getting cells
@@ -233,11 +239,21 @@ def test_extract_with_cell_processing_error(extractor):
     response = fake_response("https://example.com", "<table></table>")
     
     # Configure the header_mapper mock to return a mapping
-    extractor.header_mapper.map.return_value = {"Header1": "field1", "Header2": "field2"}
+    extractor.header_mapper.map.return_value = {"Title": "title", "Year": "year"}
     
-    # Replace the rows in the BadRowsTable with our mock row
+    # Create a table instance without using lambda to avoid recursion
     table = BadRowsTable()
-    table.css = lambda selector: [mock_row] if "tbody tr" in selector else table.css(selector)
+    original_css = table.css
+    
+    # Define a non-recursive function to replace css
+    def modified_css(selector):
+        if "tbody tr" in selector:
+            return [mock_row]
+        else:
+            return original_css(selector)
+    
+    # Replace the css method
+    table.css = modified_css
     
     # Should handle the error and return an empty list
     items = list(extractor.extract(response, table))
@@ -248,13 +264,13 @@ def test_create_item():
     """Test that _create_item correctly creates an item from cells and headers."""
     extractor = TableExtractor(MagicMock())
     
-    cells = ["Value1", "Value2", "Value3"]
-    headers = ["Header1", "Header2", "Header3"]
-    header_map = {"Header1": "field1", "Header2": "field2"}
+    cells = ["Test Film", "2021", "Director Name"]
+    headers = ["Title", "Year", "Director"]
+    header_map = {"Title": "title", "Year": "year", "Director": "director"}
     
     item = extractor._create_item(cells, headers, header_map)
     
     assert isinstance(item, BurmeseMoviesItem)
-    assert item["field1"] == "Value1"
-    assert item["field2"] == "Value2"
-    assert "field3" not in item  # Header3 is not in the mapping
+    assert item["title"] == "Test Film"
+    assert item["year"] == "2021"
+    assert item["director"] == "Director Name"

@@ -498,6 +498,9 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
         # Get project fields for this issue
         project_fields = project_fields_map.get(gh_id, {})
         
+        # Extract YAML from issue body
+        yaml_data = extract_yaml_from_body(gh_issue.get("body", ""))
+        
         # Create or update issue
         if gh_id in yaml_issues_map:
             # Update existing issue
@@ -510,8 +513,8 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
                     preserved_fields[field] = value
             
             # Update with GitHub data
-            yaml_issue["title"] = gh_issue["title"]
-            yaml_issue["description"] = gh_issue["body"] or "[no description]"
+            yaml_issue["title"] = gh_issue.get("title", f"Issue #{gh_id}")
+            yaml_issue["description"] = gh_issue.get("body", "") or "[no description]"
             
             # Update issue status (open/closed)
             old_status = yaml_issue.get("status", "open")
@@ -525,9 +528,14 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
                 if field in project_fields:
                     yaml_issue[field] = project_fields[field]
             
-            # Restore preserved fields that weren't in project fields
+            # Update with YAML data from issue body
+            if isinstance(yaml_data, dict):
+                for field, value in yaml_data.items():
+                    yaml_issue[field] = value
+            
+            # Restore preserved fields that weren't in project fields or YAML data
             for field, value in preserved_fields.items():
-                if field not in project_fields and field not in ("priority", "sprint", "size"):
+                if field not in project_fields and field not in ("priority", "sprint", "size") and (not yaml_data or field not in yaml_data):
                     yaml_issue[field] = value
                     
             updated += 1
@@ -535,8 +543,8 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
             # Create new issue
             new_issue = {
                 "github_issue": int(gh_id),
-                "title": gh_issue["title"],
-                "description": gh_issue["body"] or "[no description]",
+                "title": gh_issue.get("title", f"Issue #{gh_id}"),
+                "description": gh_issue.get("body", "") or "[no description]",
                 "status": gh_issue["state"]  # Add status field (open/closed)
             }
             
@@ -544,6 +552,11 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
             for field in ("priority", "sprint", "size"):
                 if field in project_fields:
                     new_issue[field] = project_fields[field]
+            
+            # Add YAML data from issue body
+            if isinstance(yaml_data, dict):
+                for field, value in yaml_data.items():
+                    new_issue[field] = value
                     
             updated_issues.append(new_issue)
             added += 1
@@ -562,9 +575,15 @@ def pull_from_github(yaml_issues: List[Dict[str, Any]], gh_issues: List[Dict[str
     return updated_issues
 
 
-def push_to_github(issues: List[Dict[str, Any]], gh_issues: List[Dict[str, Any]], dry_run=False):
+def push_to_github(issues: List[Dict[str, Any]], github_issues=None, gh_issues=None, dry_run=False):
     """Push issues from local YAML to GitHub."""
     print("🔁 Syncing issues to GitHub...")
+
+    # Handle both parameter names for backward compatibility
+    if github_issues is not None and gh_issues is None:
+        gh_issues = github_issues
+    elif gh_issues is None:
+        gh_issues = []
 
     gh_map = {}
 
@@ -575,49 +594,111 @@ def push_to_github(issues: List[Dict[str, Any]], gh_issues: List[Dict[str, Any]]
 
     created = 0
     updated = 0
+    skipped = 0
     
     # Process each issue in the YAML file
     for issue in issues:
+        # Skip issues without component field
+        if "component" not in issue:
+            skipped += 1
+            continue
+            
+        # Create title from component if not present
+        if "title" not in issue:
+            issue["title"] = f"[{issue['component']}] {issue.get('impact', 'Issue')}"
+            
+        # Create description from YAML fields if not present
+        if "description" not in issue:
+            yaml_block = yaml.dump(
+                {k: v for k, v in issue.items() if k not in ["github_issue", "title", "description"]},
+                default_flow_style=False
+            )
+            issue["description"] = f"```yaml\n{yaml_block}```"
+
+        # Check if this issue matches an existing GitHub issue by component
+        gh_entry = None
         gh_id = str(issue.get("github_issue", ""))
-        gh_entry = gh_map.get(gh_id)
+        
+        if gh_id and gh_id in gh_map:
+            # Direct match by issue number
+            gh_entry = gh_map[gh_id]
+        else:
+            # Try to match by component in the body
+            for gh_issue in gh_issues:
+                body = gh_issue.get("body", "")
+                yaml_data = extract_yaml_from_body(body)
+                if yaml_data and "component" in yaml_data:
+                    if yaml_data["component"].lower() == issue["component"].lower():
+                        gh_entry = gh_issue
+                        break
+
         node_id = None
 
-        if gh_entry and gh_id:
+        if gh_entry:
             # Update existing issue
-            updated_issue = update_github_issue(gh_entry["number"], issue, gh_entry, dry_run=dry_run)
-            node_id = gh_entry.get("node_id")
-            
-            if updated_issue and not dry_run:
-                # Update project fields
-                project_item_id = get_project_item_id(node_id)
-                if project_item_id:
-                    for field in ("priority", "size", "sprint"):
-                        if field in issue:
-                            update_project_field(project_item_id, field, issue[field])
+            try:
+                # Preserve existing labels if any
+                labels = []
+                if "labels" in gh_entry:
+                    labels = [label["name"] for label in gh_entry["labels"] if isinstance(label, dict) and "name" in label]
+                
+                # Set state based on status
+                state = "closed" if issue.get("status", "").lower() == "done" else "open"
+                
+                # Update the issue
+                if dry_run:
+                    print(f"[DRY-RUN] Would update issue #{gh_entry['number']}: {issue['title']}")
                 else:
-                    print(f"[WARN] Could not find project item ID for: {issue['title']}")
-            updated += 1
+                    headers = setup_api_headers()
+                    payload = {
+                        "title": issue["title"],
+                        "body": issue["description"],
+                        "state": state
+                    }
+                    
+                    # Include labels if they exist
+                    if labels:
+                        payload["labels"] = labels
+                    
+                    r = requests.patch(
+                        f"{ISSUES_ENDPOINT}/{gh_entry['number']}", 
+                        headers=headers, 
+                        json=payload
+                    )
+                    
+                    if r.status_code != 200:
+                        print(f"Error updating GitHub issue #{gh_entry['number']}: {r.text}")
+                    
+                node_id = gh_entry.get("node_id")
+                updated += 1
+            except Exception as e:
+                print(f"Error updating issue: {e}")
         else:
             # Create new issue
-            new_issue = create_github_issue(issue, dry_run=dry_run)
-            if new_issue and not dry_run:
-                issue["github_issue"] = new_issue["number"]
-                node_id = new_issue.get("node_id")
-                
-                if node_id:
-                    # Add to project and update fields
-                    add_issue_to_project(node_id)
-                    project_item_id = get_project_item_id(node_id)
+            try:
+                if dry_run:
+                    print(f"[DRY-RUN] Would create new issue: {issue['title']}")
+                else:
+                    headers = setup_api_headers()
+                    payload = {
+                        "title": issue["title"],
+                        "body": issue["description"]
+                    }
                     
-                    if project_item_id:
-                        for field in ("priority", "size", "sprint"):
-                            if field in issue:
-                                update_project_field(project_item_id, field, issue[field])
+                    r = requests.post(ISSUES_ENDPOINT, headers=headers, json=payload)
+                    
+                    if r.status_code in (200, 201):
+                        new_issue = r.json()
+                        issue["github_issue"] = new_issue["number"]
+                        node_id = new_issue.get("node_id")
                     else:
-                        print(f"[WARN] Could not find project item ID for: {issue['title']}")
-            created += 1
+                        print(f"Error creating GitHub issue: {r.text}")
+                
+                created += 1
+            except Exception as e:
+                print(f"Error creating issue: {e}")
     
-    print(f"Push summary: {created} created, {updated} updated")
+    print(f"Push summary: {created} created, {updated} updated, {skipped} skipped")
 
 
 def main():

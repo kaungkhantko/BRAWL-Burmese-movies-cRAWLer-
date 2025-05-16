@@ -1,9 +1,6 @@
 name: Sync Issues Between YAML and GitHub
 
-permissions:
-  contents: write  # Need write to update YAML file
-  issues: write    # Need write to update issues
-  project: write   # Need write to update project fields
+permissions: write-all
 
 on:
   # Run when issues are created or edited

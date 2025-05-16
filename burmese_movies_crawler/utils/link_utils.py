@@ -33,20 +33,23 @@ def is_valid_link(url, invalid_links_log=None):
     url = url.strip()
     url_lower = url.lower()
 
+    # Parse URL first so we can use it for validation
+    parsed = urlparse(url)
+    
     # Reject obvious garbage or placeholders
-    if url_lower in ("", "none", "void(0)"):
+    if url_lower in ("", "none", "void(0)") or url_lower.endswith("/none"):
         log("Empty or None")
         return False
-    if url_lower.startswith('#'):
-        log("Fragment-only link")
+    
+    # Reject fragment-only links or base URLs without paths
+    if url_lower.startswith('#') or (parsed.scheme and parsed.netloc and not parsed.path or parsed.path == '/'):
+        log("Fragment-only link or base URL")
         return False
 
     # Reject known non-crawlable schemes
     if url_lower.startswith(('javascript:', 'mailto:', 'tel:')):
         log("Non-crawlable scheme")
         return False
-
-    parsed = urlparse(url)
 
     # Allow valid absolute http/https URLs
     if parsed.scheme in ("http", "https") and parsed.netloc:

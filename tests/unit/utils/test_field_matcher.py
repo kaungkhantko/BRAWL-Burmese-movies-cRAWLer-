@@ -119,10 +119,11 @@ def test_match_with_multiple_matches():
     with patch("burmese_movies_crawler.utils.field_matcher.process") as mock_process:
         # Set up the mock to return different scores for different fields
         def mock_extract_one(text, choices):
-            if "title" in choices:
-                return "Film Title", 90
-            elif "name" in choices:
-                return "Film Title", 85
+            if "Film Title" in choices:
+                if "Movie Title" in choices:  # This is the title field
+                    return "Film Title", 90
+                else:  # This is the name field
+                    return "Film Title", 85
             return None, 0
         
         mock_process.extractOne = mock_extract_one

@@ -68,16 +68,11 @@ def test_clean_text_with_regex_error():
     """Test that clean handles regex errors gracefully."""
     cleaner = TextCleaner()
     
-    # Replace the pattern with one that will raise an exception
-    original_pattern = cleaner._pattern
-    try:
-        # Mock the regex split to raise an exception
-        with patch.object(CLEAN_TEXT_PATTERN, 'split', side_effect=Exception("Regex error")):
-            # Should fall back to simple cleaning
-            assert cleaner.clean("Director: John Doe") == "Director: John Doe"
-    finally:
-        # Restore the original pattern
-        cleaner._pattern = original_pattern
+    # Mock the pattern's split method by patching the cleaner instance
+    with patch.object(cleaner, '_pattern') as mock_pattern:
+        mock_pattern.split.side_effect = Exception("Regex error")
+        # Should fall back to simple cleaning
+        assert cleaner.clean("Director: John Doe") == "Director: John Doe"
 
 
 def test_clean_text_caching():
