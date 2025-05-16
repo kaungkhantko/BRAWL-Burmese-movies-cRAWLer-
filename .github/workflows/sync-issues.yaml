@@ -36,7 +36,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install PyYAML requests python-dotenv gql rich
+          pip install PyYAML requests python-dotenv gql rich requests_toolbelt
 
       - name: Extract repository owner and name
         id: repo-info
