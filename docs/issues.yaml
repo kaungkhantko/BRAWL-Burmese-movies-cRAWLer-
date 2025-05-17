@@ -4,3 +4,449 @@
   impact: safe
   suggestion: noop
   status: todo
+  title: '[SafeComp] safe'
+  description: '```yaml
+
+    category: Ops
+
+    component: SafeComp
+
+    impact: safe
+
+    severity: low
+
+    status: todo
+
+    suggestion: noop
+
+    ```'
+  github_issue: 101
+- github_issue: 100
+  title: '[MissingComponent] test'
+  description: '```yaml
+
+    category: DataQuality
+
+    component: MissingComponent
+
+    impact: test
+
+    severity: medium
+
+    status: todo
+
+    suggestion: x
+
+    ```'
+  status: todo
+  category: DataQuality
+  component: MissingComponent
+  impact: test
+  severity: medium
+  suggestion: x
+- github_issue: 99
+  title: '[MissingComponent] test'
+  description: '```yaml
+
+    category: DataQuality
+
+    component: MissingComponent
+
+    impact: test
+
+    severity: medium
+
+    status: todo
+
+    suggestion: x
+
+    ```'
+  status: todo
+  category: DataQuality
+  component: MissingComponent
+  impact: test
+  severity: medium
+  suggestion: x
+- github_issue: 98
+  title: '[MissingComponent] test'
+  description: '```yaml
+
+    category: DataQuality
+
+    component: MissingComponent
+
+    impact: test
+
+    severity: medium
+
+    status: todo
+
+    suggestion: x
+
+    ```'
+  status: todo
+  category: DataQuality
+  component: MissingComponent
+  impact: test
+  severity: medium
+  suggestion: x
+- github_issue: 97
+  title: Implement Site Profile Registry
+  description: Treating all sites identically leads to fallback noise and poor extraction.
+    Implement a YAML/JSON-based site profile system to define selectors, JS flags,
+    field maps, and rate limits per site.
+  status: open
+  priority: P0
+  sprint: Sprint 5
+  size: L
+- github_issue: 95
+  title: Localize Date and Number Parsing
+  description: Burmese numerals and alternate calendars can cause parsing errors.
+    Use dateparser with `languages=['my', 'en']` and normalize Burmese digits.
+  status: open
+  priority: P1
+  sprint: Sprint 9
+  size: S
+- github_issue: 94
+  title: Support Incremental Upserts in Database
+  description: Full re-imports can overwrite manually fixed records. Support upserts
+    using (title, year) as primary key and track last_seen and changed timestamps.
+  status: open
+  priority: P1
+  sprint: Sprint 9
+  size: M
+- github_issue: 93
+  title: Add Schema Versioning and Migration Scripts
+  description: Breaking schema changes require costly reprocessing and may break APIs.
+    Introduce semantic versioning on MovieItem and create upgrade/downgrade scripts.
+  status: open
+  priority: P2
+  sprint: Sprint 9
+  size: M
+- github_issue: 92
+  title: Pin Library Versions and Enable CVE Scanning
+  description: Unpinned libraries like Selenium and fuzzywuzzy expose security and
+    performance risks. Lock versions in requirements and enable dependabot + safety
+    checks.
+  status: open
+  priority: P1
+  sprint: Sprint 10
+  size: M
+- github_issue: 91
+  title: Add Request Rate-Limiting and IP Rotation
+  description: Requests can trigger blocking or captchas. Add domain-specific delay
+    and rotate proxies with respect for terms of service.
+  status: open
+  priority: P0
+  sprint: Sprint 5
+  size: S
+- github_issue: 90
+  title: Obey robots.txt and Site Policies
+  description: Crawling without robots.txt compliance may cause legal or ethical issues.
+    Enforce robots.txt parsing and allow per-site opt-outs and custom user-agent strings.
+  status: open
+  priority: P1
+  sprint: Sprint 9
+  size: M
+- github_issue: 89
+  title: Enforce Coverage and Static Analysis in CI
+  description: Dead code and style drift creep in over time. Enforce ≥85% test coverage
+    and run ruff, black, and mypy in CI pipeline.
+  status: open
+  priority: P2
+  sprint: Sprint 10
+  size: S
+- github_issue: 88
+  title: Add JavaScript-Heavy Site Tests
+  description: Selenium logic is untested in CI and can regress silently. Add GitHub
+    Actions job with xvfb or Playwright tests for JS examples.
+  status: open
+  priority: P2
+  sprint: Sprint 9
+  size: S
+- github_issue: 87
+  title: Add Multilingual and Encoding Tests
+  description: UTF-8 and Unicode edge cases can break Burmese or mixed-language pages.
+    Add parameterized pytest fixtures and fuzz encodings with random samples.
+  status: open
+  priority: P2
+  sprint: Sprint 8
+  size: M
+- github_issue: 86
+  title: Add Mock Mode Maintenance System
+  description: Fixtures grow stale and diverge from production reality. Provide a
+    fixture refresh script and CI job to flag diffs against live HTML.
+  status: open
+  priority: P1
+  sprint: Sprint 6
+  size: S
+- github_issue: 85
+  title: Add Retry and Backoff Strategy
+  description: Transient 5xx or 429 errors cause unnecessary failures. Implement exponential
+    backoff, domain circuit breakers, and retry alerts.
+  status: open
+  priority: P1
+  sprint: Sprint 2
+  size: M
+- github_issue: 84
+  title: Add Structured Logging and Prometheus Metrics
+  description: Crawl visibility is limited; hard to catch error spikes or misfires.
+    Add structured JSON logging, Prometheus counters, and Grafana dashboards.
+  status: open
+  priority: P0
+  sprint: Sprint 1
+  size: M
+- github_issue: 83
+  title: Add Field-Level Provenance Tracking
+  description: It's hard to debug extraction errors without raw HTML context. Store
+    source HTML hash and selector paths alongside parsed data.
+  status: open
+  priority: P0
+  sprint: Sprint 4
+  size: M
+- github_issue: 82
+  title: Add Pipeline Validation and Quality Metrics
+  description: Schema drift or missing fields silently degrade downstream data quality.
+    Add validation for null %s, value ranges, year sanity checks, and expose Prometheus
+    metrics.
+  status: open
+  priority: P2
+  sprint: Sprint 6
+  size: M
+- github_issue: 81
+  title: Increase CandidateExtractor Precision
+  description: Noisy blocks lead to false positives when passed to Trafilatura. Pre-filter
+    blocks that lack at least two of title, year, or director.
+  status: open
+  priority: P0
+  sprint: Sprint 3
+  size: M
+- github_issue: 80
+  title: Improve FieldExtractor Accuracy and Speed
+  description: Fuzzy mis-mapping results in incorrect field labels like director →
+    cast. Set fuzzy match threshold ≥80, log scores, and switch from fuzzywuzzy to
+    rapidfuzz.
+  status: closed
+  priority: P1
+  sprint: Sprint 1
+  size: M
+- github_issue: 79
+  title: Guard Memory Footprint on Large Pages
+  description: Some HTML pages are large enough to cause OOM errors in small containers.
+    Stream parse large pages with lxml.iterparse or check size before DOM-heavy operations.
+  status: open
+  priority: P1
+  sprint: Sprint 5
+  size: S
+- github_issue: 78
+  title: Enable Deduplication and Caching
+  description: Redundant fetches waste bandwidth, and duplicates bloat the dataset.
+    Enable scrapy-deltafetch or implement hash-based caching and item fingerprinting.
+  status: open
+  priority: P1
+  sprint: Sprint 4
+  size: M
+- github_issue: 77
+  title: Optimize Async I/O and Concurrency Tuning
+  description: Sequential blocking limits throughput and cannot meet daily re-crawl
+    SLA. Tune CONCURRENT_REQUESTS, use async renderer workers, and adjust auto-throttle
+    settings.
+  status: open
+  priority: P1
+  sprint: Sprint 4
+  size: L
+- github_issue: 76
+  title: Decouple JS Rendering and Evaluate Async Playwright Pool
+  description: JS rendering dominates crawl time and RAM usage, making parallelism
+    difficult. Make JS rendering configurable per-domain and evaluate Playwright async
+    pools.
+  status: open
+  priority: P0
+  sprint: Sprint 3
+  size: M
+- github_issue: 75
+  title: Add Crawl Resume via Checkpointing
+  description: Long-running jobs lose progress on crash and may duplicate items on
+    restart. Add state persistence using scrapy-checkpoint or Redis-based queues.
+  status: open
+  priority: P0
+  sprint: Sprint 6
+  size: M
+- github_issue: 73
+  title: Improve PageClassifier Rule Robustness
+  description: Static thresholds in rule-based classification break on layout shifts
+    and do not scale well. Add rule-firing telemetry and prepare dataset for a lightweight
+    ML fallback.
+  status: open
+  priority: P1
+  sprint: Sprint 3
+  size: M
+- github_issue: 72
+  title: Refactor Spider-Orchestrator Responsibility Split
+  description: Overlapping responsibilities between Spider and Orchestrator blur ownership
+    and make unit testing harder. Let Orchestrator own classification and extraction,
+    and restrict Spider to I/O operations only.
+  status: open
+  priority: P0
+  sprint: Sprint 5
+  size: L
+- github_issue: 23
+  title: Save Live Pages as Fixture Files (Auto-Fixture Generator)
+  description: Create a CLI tool that takes a URL and saves the page's HTML content
+    into the correct `tests/fixtures/` location using the `md5(url).html` naming scheme.
+  status: open
+  priority: P1
+  sprint: Sprint 8
+  size: S
+- github_issue: 22
+  title: Build output_schema.json Definition
+  description: JSON output validated against output_schema.json; crawl aborts on schema
+    errors. Validation tests included.
+  status: open
+  priority: P1
+  sprint: Sprint 6
+  size: S
+- github_issue: 21
+  title: Retry Log Persistence & Requeue
+  description: Failed URL list persisted; optional flag re‑seeds next crawl. Includes
+    unit test and failed_urls.json spec.
+  status: open
+  priority: P1
+  sprint: Sprint 6
+  size: M
+- github_issue: 20
+  title: Create Data Quality Report Post-Run
+  description: Post‑run script outputs missing‑field counts and basic stats in Markdown/HTML.
+  status: open
+  priority: P1
+  sprint: Sprint 6
+  size: M
+- github_issue: 19
+  title: Setup CLI Summary Command
+  description: python -m tools.summary --last pretty‑prints most recent run summary.
+  status: open
+  priority: P2
+  sprint: Sprint 10
+  size: S
+- github_issue: 18
+  title: Build Snapshot HTML Comparisons for Testing
+  description: pytest --html-snapshots compares new scrape vs stored HTML; fail on
+    diff > threshold.
+  status: open
+  priority: P1
+  sprint: Sprint 10
+  size: M
+- github_issue: 16
+  title: Track Field-Level Provenance
+  description: Each exported field includes source_url and selector metadata.
+  status: open
+  priority: P0
+  sprint: Sprint 4
+  size: M
+- github_issue: 15
+  title: Add Schema Drift Detection
+  description: Crawl compares current DOM hash to last snapshot; logs warning on significant
+    drift.
+  status: open
+  priority: P1
+  sprint: Sprint 4
+  size: L
+- github_issue: 13
+  title: Implement a Learning Loop for Selector Prioritization
+  description: Nightly job retrains selector ranking from crawl logs; new weights
+    applied next run.
+  status: open
+  priority: P2
+  sprint: Sprint 7
+  size: XL
+- github_issue: 12
+  title: Integrate Database Storage (PostgreSQL)
+  description: Pipeline writes items to Postgres via SQLAlchemy. Upsert prevents dupes.
+  status: open
+  priority: P2
+  sprint: Sprint 8
+  size: L
+- github_issue: 11
+  title: Add Web UI to Visualize Scraping Progress
+  description: Minimal web dashboard shows live item count, error count, active URL.
+  status: open
+  priority: P2
+  sprint: Sprint 8
+  size: L
+- github_issue: 10
+  title: Prioritize Better Link Selectors Dynamically
+  description: Spider ranks selector list by historical success %. Stores selector
+    stats.
+  status: open
+  priority: P2
+  sprint: Sprint 7
+  size: L
+- github_issue: 9
+  title: Improve OpenAI Fallback Robustness
+  description: Fallback activates only when no selectors return data. Handles OpenAI
+    errors gracefully.
+  status: closed
+  priority: P2
+  sprint: Sprint 2
+  size: M
+- github_issue: 8
+  title: Tune Scoring Methods for Catalogue Detection
+  description: Scoring parameters live in config and are adjustable. Values tuned
+    empirically.
+  status: open
+  priority: P1
+  sprint: Sprint 2
+  size: S
+- github_issue: 7
+  title: Parallelize Table Parsing
+  description: Parsing large <table> pages processed concurrently with proven speedup.
+  status: open
+  priority: P2
+  sprint: Sprint 10
+  size: M
+- github_issue: 6
+  title: Add Data Validation Before Yielding Items
+  description: Each item passes pydantic schema validation; invalid items are dropped.
+  status: closed
+  priority: P0
+  sprint: Sprint 1
+  size: M
+- github_issue: 5
+  title: Filter Invalid Links Before Following
+  description: Reject all specified bad patterns before link following. High coverage
+    required.
+  status: closed
+  priority: P0
+  sprint: Sprint 1
+  size: S
+- github_issue: 4
+  title: Move Selectors to External Config (YAML/JSON)
+  description: Selectors externalized into YAML/JSON config for flexible updates.
+  status: open
+  priority: P1
+  sprint: Sprint 2
+  size: M
+- github_issue: 3
+  title: Add a Mock Mode for Local Testing
+  description: MOCK_MODE=true env var makes crawler read HTML fixtures instead of
+    fetching live.
+  status: closed
+  priority: P1
+  sprint: Sprint 1
+  size: S
+- github_issue: 2
+  title: Implement Retry Logic for Selenium and OpenAI calls
+  description: Failed HTTP/Selenium/OpenAI requests are retried up to N times, exponential
+    back‑off. Final failure logged.
+  status: open
+  priority: P0
+  sprint: Sprint 2
+  size: M
+- github_issue: 1
+  title: Decouple Selenium into a SeleniumManager class
+  description: New utils/selenium_manager.py handles driver lifecycle; spider uses
+    it via DI.
+  status: open
+  priority: P1
+  sprint: Sprint 3
+  size: M
