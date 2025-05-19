@@ -1,0 +1,13 @@
+# Development and testing dependencies
+-r requirements.txt
+
+# Code quality tools
+black==25.1.0
+isort==6.0.1
+pylint==3.3.7
+ruff==0.11.9
+
+# Testing
+coverage==7.8.0
+pytest>=7.0.0
+pytest-cov>=4.1.0
