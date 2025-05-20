@@ -1,108 +1,96 @@
+# BRAWL - Burmese Movies Crawler
 
-# Burmese Movies Catalogue Crawler
+A web crawler for Burmese movies information.
 
-A smart, self-improving web crawler for building a structured catalogue of Burmese movies from various online sources.
+## Overview
 
----
-
-## Project Vision
-
-Originally launched as a **learning project**, this crawler has grown into a modular framework aimed at:
-
-* Cataloguing Burmese cinema across fragmented, low-structure sources
-* Powering a searchable frontend with built-in analytics
-* Scaling into a metadata aggregator for other domains (e.g., video games)
-
----
-
-## Mission & Goals
-
-The mission of this crawler is to build a **comprehensive, research-grade** catalogue of Burmese films, including feature films, TV series, documentaries, and short films. It is designed to:
-
-* Serve both the **general public** and **academic researchers**
-* Enable **dataset export** for downstream analytics
-* Offer **API access and human validation workflows**
-* Respect multilingual and script variations (Zawgyi/Unicode)
-
-All fields are tagged with **source-level provenance**, and entries can start sparse (e.g., title-only) and be enriched later.
-
----
+BRAWL (Burmese movies cRAWLer) is a specialized web crawler built with Scrapy to extract information about Burmese movies from various online sources.
 
 ## Features
 
-* **Dynamic Page Classification**: Automatically detects catalogue vs detail pages using rule-based scoring
-* **Link Filtering + Retry Logic**: Skips invalid links (`javascript:`, fragments, etc.) and queues failed requests
-* **Fuzzy Extraction**: Universal field matching with fallback logic (e.g., for noisy headers like "Directed by")
-* **Paginated Crawling**: Handles multi-page catalogue sections
-* **Field-Level Provenance**: Tracks which source each field was extracted from
-* **Timestamped Output**: JSON results and logs saved by run
-
----
-
-## Strategic Design Pillars
-
-**Research-first**: Prioritizes accuracy and provenance for fields like awards, director, and year.
-
-**Breadth-first**: Accepts incomplete entries (e.g., title only) and enriches them over time.
-
-**Merge and Resolve**: Combines film data from multiple sources using fuzzy matching and trust logic.
-
-**Mock Mode**: Fully supports offline development using saved HTML fixtures.
-
-**Retry Logic**: Failed URLs are retried in future runs for higher long-term coverage.
-
-**Editor Enrichment**: Supports external interfaces for humans to validate and update metadata.
-
----
+- Extracts movie details including title, year, director, cast, and more
+- Supports both normal and mock modes for testing
+- Handles different page types (catalogues and detail pages)
+- Provides detailed run summaries and logs
 
 ## Installation
 
-```bash
-git clone https://github.com/kaungkhantko/BRAWL-Burmese-movies-cRAWLer-
-cd BRAWL-Burmese-movies-cRAWLer-
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/BRAWL-Burmese-movies-cRAWLer-.git
+   cd BRAWL-Burmese-movies-cRAWLer-
+   ```
+
+2. Create and activate a virtual environment:
+   ```
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
+   ```
+
+3. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   pip install -r requirements-dev.txt  # For development
+   ```
+
+## Usage
+
+### Running the Crawler
+
+To run the crawler in normal mode:
+```
+python run_crawler.py
 ```
 
----
-
-## 🕹 Usage
-
-```bash
-source .venv/bin/activate
-python run_spider.py
+To run the crawler in mock mode:
+```
+python run_crawler.py --mock
 ```
 
-The crawler will:
+### Command Line Options
 
-* Classify page types
-* Extract and follow valid links
-* Scrape and enrich movie fields
-* Save all outputs to `output/{timestamp}/`
+- `--mock`: Run in mock mode using fixtures instead of making real HTTP requests
+- `--fixture FIXTURE`: Specify a fixture to use for the first URL (only in mock mode)
+- `--compare-golden`: Compare output with golden file (only in mock mode)
+- `--update-golden`: Update the golden file with current output (only in mock mode)
+- `--timeout SECONDS`: Set the timeout in seconds (default: 90)
 
-### Output Files
+## Project Structure
 
-* `movies_*.json`: structured film data
-* `run_summary_*.json`: crawl statistics
-* `crawler_output_*.log`: runtime logs
-* `invalid_links_*.json`: skipped URLs with reasons
+```
+burmese_movies_crawler/
+├── core/                   # Core functionality
+│   ├── io_utils.py         # I/O utilities
+│   ├── link_utils.py       # Link handling utilities
+│   ├── mock_utils.py       # Mock mode utilities
+│   ├── orchestrator.py     # Page processing orchestrator
+│   ├── page_classifier.py  # Page classification
+│   ├── process_utils.py    # Process handling utilities
+│   └── selenium_manager.py # Selenium WebDriver management
+├── extractors/             # Data extraction modules
+├── resources/              # Resource files
+├── schema/                 # Data schemas
+├── spiders/                # Scrapy spiders
+└── utils/                  # Utility modules
+tests/
+├── fixtures/               # Test fixtures
+├── integrated/             # Integration tests
+└── unit/                   # Unit tests
+```
 
----
+## Testing
 
-## Further Reading
+Run the tests with:
+```
+pytest
+```
 
-* [`Internal structure and modules`](docs/architecture.md)
-* [`Full requirements + strategy map`](docs/requirements_strategy_execution.md)
-* [` Documentation for developers`](docs/documentation.md)
+## Mock Mode
 
----
+Mock mode allows running the crawler without making real HTTP requests. It uses pre-recorded HTML fixtures instead. This is useful for testing and development.
+
+To learn more about mock mode, see [MOCK_MODE.md](MOCK_MODE.md).
 
 ## License
 
-MIT — free to use, remix, or build upon.
-
----
-
-> Built solo as an educational, ethical, and technical exploration of how to preserve and promote Burmese film metadata at scale.
-
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -6,10 +6,10 @@ from typing import Dict, List, Any, Optional, Generator
 
 from burmese_movies_crawler.items import BurmeseMoviesItem
 from burmese_movies_crawler.utils.exceptions import FieldExtractorError
-from burmese_movies_crawler.extractors.link_extractor import LinkExtractor
-from burmese_movies_crawler.extractors.main_field_extractor import MainFieldExtractor
-from burmese_movies_crawler.extractors.paragraph_extractor import ParagraphExtractor
-from burmese_movies_crawler.extractors.table_extractor import TableExtractor
+from burmese_movies_crawler.core.extractors.link_extractor import LinkExtractor
+from burmese_movies_crawler.core.extractors.main_field_extractor import MainFieldExtractor
+from burmese_movies_crawler.core.extractors.paragraph_extractor import ParagraphExtractor
+from burmese_movies_crawler.core.extractors.table_extractor import TableExtractor
 
 logger = logging.getLogger(__name__)
 

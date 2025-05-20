@@ -54,13 +54,13 @@ DOWNLOAD_DELAY = 3
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "burmese_movies.middlewares.BurmeseMoviesSpiderMiddleware": 543,
+#    "burmese_movies_crawler.middlewares.BurmeseMoviesSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "burmese_movies.middlewares.BurmeseMoviesDownloaderMiddleware": 543,
+#    "burmese_movies_crawler.middlewares.BurmeseMoviesDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -72,7 +72,7 @@ DOWNLOAD_DELAY = 3
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   "burmese_movies.pipelines.BurmeseMoviesPipeline": 100,
+   "burmese_movies_crawler.pipelines.BurmeseMoviesPipeline": 100,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -99,3 +99,6 @@ ITEM_PIPELINES = {
 # Set settings whose default value is deprecated to a future-proof value
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+# Add CLOSESPIDER_TIMEOUT setting to limit the spider runtime
+CLOSESPIDER_TIMEOUT = 85  # 85 seconds (slightly less than our 90 second timeout)

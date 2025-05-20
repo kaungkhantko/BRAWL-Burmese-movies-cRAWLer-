@@ -5,46 +5,23 @@ import logging
 import os
 import json
 from datetime import datetime, timezone
-from selenium.webdriver.chrome.options import Options
-from fuzzywuzzy import process
 from scrapy import signals
-from burmese_movies_crawler.items import BurmeseMoviesItem, FIELD_SELECTORS
-from burmese_movies_crawler.utils.orchestrator import handle_page
-from burmese_movies_crawler.utils.link_utils import (
-    rule_link_heavy, rule_text_heavy,
-    rule_table_catalogue, rule_fallback_links
-)
-from burmese_movies_crawler.utils.selenium_manager import SeleniumManager
-from burmese_movies_crawler.utils.page_classifier import PageClassifier
+
+from burmese_movies_crawler.items import BurmeseMoviesItem
+from burmese_movies_crawler.core.orchestrator import handle_page
+from burmese_movies_crawler.core.page_classifier import PageClassifier
+from burmese_movies_crawler.core.selenium_manager import SeleniumManager
+from burmese_movies_crawler.core.mock_utils import get_response_or_request
 from burmese_movies_crawler.factory import create_extractor_engine
-from burmese_movies_crawler.utils.orchestrator import handle_page
-from burmese_movies_crawler.utils.link_utils import get_response_or_request
-from burmese_movies_crawler.settings import MOCK_MODE
+from burmese_movies_crawler.config import MOCK_MODE, DEFAULT_RULE_THRESHOLDS, CATALOGUE_RULES, START_URLS
 
 logger = logging.getLogger(__name__)
+
 
 class MoviesSpider(scrapy.Spider):
     name = "movies"
     allowed_domains = ["channelmyanmar.to"]
-    start_urls = [
-        "https://www.channelmyanmar.to/movies/",
-        "https://en.wikipedia.org/wiki/List_of_Burmese_films",
-        "https://www.imdb.com/search/title/?country_of_origin=MM",
-        "https://www.savemyanmarfilm.org/film-catalogue/"
-    ]
-
-    def start_requests(self):
-        for url in self.start_urls:
-            yield get_response_or_request(url, self.parse)
-
-
-    @classmethod
-    def from_crawler(cls, crawler, *args, **kwargs):
-        spider = super().from_crawler(crawler, *args, **kwargs)
-        spider.crawler.settings.set('FEEDS', {spider.movies_output_file: {'format': 'json', 'encoding': 'utf8', 'overwrite': False}}, priority='spider')
-        crawler.signals.connect(spider.open_spider, signal=signals.spider_opened)
-        crawler.signals.connect(spider.close_spider, signal=signals.spider_closed)
-        return spider
+    start_urls = START_URLS
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -55,27 +32,37 @@ class MoviesSpider(scrapy.Spider):
         self.warnings, self.errors = [], []
         self.items_scraped = 0
         self.invalid_links = []
+        self.fixture = kwargs.get('fixture')  # Get fixture from spider arguments
 
-        self.DEFAULT_RULE_THRESHOLDS = {
-            'link_heavy_min_links': 50,
-            'link_heavy_max_iframes': 0,
-            'text_heavy_min_paragraphs': 50,
-            'text_heavy_max_images': 5,
-            'fallback_min_links': 30,
-            'fallback_max_images': 5,
-            'table_min_rows': 3,
-            'score_threshold': 4,
-        }
-
-        self.CATALOGUE_RULES = [
-            ("link_heavy", rule_link_heavy, 2),
-            ("text_heavy", rule_text_heavy, 2),
-            ("table_catalogue", rule_table_catalogue, 3),
-            ("fallback_links", rule_fallback_links, 1),
-        ]
-
-        self.classifier = PageClassifier(self.DEFAULT_RULE_THRESHOLDS, self.CATALOGUE_RULES)
+        self.classifier = PageClassifier(DEFAULT_RULE_THRESHOLDS, CATALOGUE_RULES)
         self.extractor = create_extractor_engine(content_type='movies', invalid_links=self.invalid_links)
+        
+        # Track fixtures used for reporting
+        self.fixtures_used = set()
+
+    def start_requests(self):
+        # If a specific fixture is provided, use it for the first URL
+        if MOCK_MODE and self.fixture:
+            url = self.start_urls[0]
+            logger.info(f"Using fixture {self.fixture} for {url}")
+            self.fixtures_used.add(self.fixture)
+            yield get_response_or_request(url, self.parse, fixture_name=self.fixture)
+            
+            # Process remaining URLs normally
+            for url in self.start_urls[1:]:
+                yield get_response_or_request(url, self.parse)
+        else:
+            # Process all URLs normally
+            for url in self.start_urls:
+                yield get_response_or_request(url, self.parse)
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        spider = super().from_crawler(crawler, *args, **kwargs)
+        spider.crawler.settings.set('FEEDS', {spider.movies_output_file: {'format': 'json', 'encoding': 'utf8', 'overwrite': False}}, priority='spider')
+        crawler.signals.connect(spider.open_spider, signal=signals.spider_opened)
+        crawler.signals.connect(spider.close_spider, signal=signals.spider_closed)
+        return spider
 
     def _setup_paths(self):
         timestamp = os.getenv("SCRAPY_RUN_TIMESTAMP", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -94,10 +81,14 @@ class MoviesSpider(scrapy.Spider):
             self.driver = self.selenium_mgr.__enter__()
             self.start_time = datetime.now(timezone.utc)
             logger.info("Chrome Driver started.")
+        else:
+            self.selenium_mgr = None
+            self.start_time = datetime.now(timezone.utc)
+            logger.info("Running in MOCK MODE - no Chrome Driver needed.")
 
     def close_spider(self, spider, reason):
         # tear down Selenium
-        if self.selenium_mgr:
+        if hasattr(self, 'selenium_mgr') and self.selenium_mgr:
             self.selenium_mgr.__exit__(None, None, None)
         # record end time and save summary
         self.end_time = datetime.now(timezone.utc)
@@ -122,19 +113,33 @@ class MoviesSpider(scrapy.Spider):
             "errors": self.errors,
             "movies_output_file": self.movies_output_file,
             "log_file": self.log_file,
-            "close_reason": reason
+            "close_reason": reason,
+            "mock_mode": MOCK_MODE
         }
+        
+        # Add fixtures used if in mock mode
+        if MOCK_MODE:
+            summary["fixtures_used"] = list(self.fixtures_used)
+        
         with open(self.summary_file, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=4, ensure_ascii=False)
         logger.info(f"Run summary saved to: {self.summary_file}")
 
     def parse(self, response):
         logger.info(f"Parsing page: {response.url}")
+        
+        # Track fixtures used in mock mode
+        if MOCK_MODE and hasattr(response, 'url') and response.url.startswith('http'):
+            # Extract fixture name from request meta if available
+            fixture_name = response.request.meta.get('fixture_name') if hasattr(response, 'request') else None
+            if fixture_name:
+                self.fixtures_used.add(fixture_name)
+        
         try:
             result = handle_page(response.text, response.url,
                                 self.classifier, self.extractor)
         except Exception as e:
-            logger.exception(f"Failed to classify “{response.url}”: {e}")
+            logger.exception(f"Failed to classify {response.url}: {e}")
             self.errors.append((response.url, str(e)))
             return
 
@@ -161,31 +166,3 @@ class MoviesSpider(scrapy.Spider):
             # unknown gets retried through candidate_extractor fallback
             for link in result.get("fallback_links", []):
                 yield response.follow(link, callback=self.parse)
-
-
-    def evaluate_catalogue_rules(self, response, stats):
-        """Evaluate all rules and collect their boolean outcomes."""
-        results = []
-
-        for name, rule_fn, weight in self.CATALOGUE_RULES:
-            try:
-                if name == "table_catalogue":
-                    passed = rule_fn(response, stats)
-                else:
-                    passed = rule_fn(stats)
-                results.append({
-                    'name': name,
-                    'passed': passed,
-                    'weight': weight
-                })
-                logger.info(f"[Rule {name}] Passed={passed} (weight {weight})")
-            except Exception as e:
-                logger.error(f"[Rule Error] {name}: {e}")
-                results.append({
-                    'name': name,
-                    'passed': False,
-                    'weight': weight
-                })
-
-        return results
-

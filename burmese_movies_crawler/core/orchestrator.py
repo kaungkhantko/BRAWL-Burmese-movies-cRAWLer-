@@ -1,18 +1,40 @@
-# # burmese_movies_crawler/utils/orchestrator.py
+"""
+Orchestrator for the Burmese Movies Crawler.
+
+This module provides functionality for handling page processing and extraction.
+"""
 
 from scrapy.http import HtmlResponse
-from burmese_movies_crawler.utils.page_classifier import PageClassifier
-from burmese_movies_crawler.extractors.engine import ExtractorEngine
-from burmese_movies_crawler.utils.candidate_extractor import extract_candidate_blocks
-from burmese_movies_crawler.utils.trafilatura_selectorr import pick_movie_block_with_trafilatura
 import logging
 
-logger = logging.getLogger(__name__)
-def handle_page(html: str, url: str,
-                classifier: PageClassifier,
-                extractor: ExtractorEngine,
-                content_type: str = "movies") -> dict:
+from burmese_movies_crawler.core.page_classifier import PageClassifier
+from burmese_movies_crawler.core.extractors.engine import ExtractorEngine
+from burmese_movies_crawler.utils.candidate_extractor import extract_candidate_blocks
+from burmese_movies_crawler.utils.trafilatura_selectorr import pick_movie_block_with_trafilatura
 
+logger = logging.getLogger(__name__)
+
+
+def handle_page(
+    html: str, 
+    url: str,
+    classifier: PageClassifier,
+    extractor: ExtractorEngine,
+    content_type: str = "movies"
+) -> dict:
+    """
+    Handle a page by classifying it and extracting data.
+    
+    Args:
+        html: The HTML content
+        url: The URL of the page
+        classifier: The page classifier
+        extractor: The extractor engine
+        content_type: The content type
+        
+    Returns:
+        Dictionary with page type and extracted data
+    """
     response = HtmlResponse(url=url, body=html, encoding='utf-8')
 
     if classifier.is_catalogue_page(response): 

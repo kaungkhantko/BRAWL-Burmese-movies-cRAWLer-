@@ -6,7 +6,7 @@ from typing import List, Optional, Set
 from urllib.parse import urldefrag, urljoin
 
 from burmese_movies_crawler.utils.exceptions import ExtractionError
-from burmese_movies_crawler.utils.link_utils import is_valid_link
+from burmese_movies_crawler.core.link_utils import is_valid_link
 
 logger = logging.getLogger(__name__)
 

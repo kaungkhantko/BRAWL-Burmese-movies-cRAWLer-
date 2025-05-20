@@ -3,11 +3,11 @@ Factory module for creating extractor components.
 """
 from typing import List, Optional
 
-from burmese_movies_crawler.extractors.engine import ExtractorEngine
-from burmese_movies_crawler.extractors.link_extractor import LinkExtractor
-from burmese_movies_crawler.extractors.main_field_extractor import MainFieldExtractor
-from burmese_movies_crawler.extractors.paragraph_extractor import ParagraphExtractor
-from burmese_movies_crawler.extractors.table_extractor import TableExtractor
+from burmese_movies_crawler.core.extractors.engine import ExtractorEngine
+from burmese_movies_crawler.core.extractors.link_extractor import LinkExtractor
+from burmese_movies_crawler.core.extractors.main_field_extractor import MainFieldExtractor
+from burmese_movies_crawler.core.extractors.paragraph_extractor import ParagraphExtractor
+from burmese_movies_crawler.core.extractors.table_extractor import TableExtractor
 from burmese_movies_crawler.utils.field_mapper import FieldMapper
 from burmese_movies_crawler.utils.field_matcher import FieldMatcher
 from burmese_movies_crawler.utils.header_mapper import HeaderMapper

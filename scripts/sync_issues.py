@@ -2,6 +2,9 @@
 """
 GitHub Issues Sync Tool (GraphQL Project Sync Enabled)
 
+Used by .github/workflows/sync-issues.yaml
+Do not delete unless CI is updated accordingly
+
 Syncs issues between a local YAML file and GitHub Projects.
 Supports pulling project fields (Priority, Sprint, Size) from GitHub.
 

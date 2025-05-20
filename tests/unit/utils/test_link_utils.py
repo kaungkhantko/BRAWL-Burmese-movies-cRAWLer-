@@ -1,5 +1,5 @@
 import pytest
-from burmese_movies_crawler.utils.link_utils import (
+from burmese_movies_crawler.core.link_utils import (
     is_valid_link,
     extract_page_stats,
     rule_detail_like,
@@ -361,9 +361,9 @@ class TestEvaluateCatalogueRules:
             'fallback_max_images': 5
         }
         rules = [
-            ("link_heavy", rule_link_heavy, 1),
-            ("text_heavy", rule_text_heavy, 2),
-            ("table_catalogue", rule_table_catalogue, 3)
+            ("link_heavy", "rule_link_heavy", 1),
+            ("text_heavy", "rule_text_heavy", 2),
+            ("table_catalogue", "rule_table_catalogue", 3)
         ]
         
         results = evaluate_catalogue_rules(response, stats, rules, thresholds)
@@ -398,9 +398,9 @@ class TestEvaluateCatalogueRules:
             'fallback_max_images': 5
         }
         rules = [
-            ("link_heavy", rule_link_heavy, 1),
-            ("text_heavy", rule_text_heavy, 2),
-            ("table_catalogue", rule_table_catalogue, 3)
+            ("link_heavy", "rule_link_heavy", 1),
+            ("text_heavy", "rule_text_heavy", 2),
+            ("table_catalogue", "rule_table_catalogue", 3)
         ]
         
         results = evaluate_catalogue_rules(response, stats, rules, thresholds)
@@ -428,9 +428,9 @@ class TestEvaluateCatalogueRules:
             raise KeyError("Missing key")
         
         rules = [
-            ("link_heavy", rule_link_heavy, 1),
-            ("failing_rule", failing_rule, 2),
-            ("text_heavy", rule_text_heavy, 3)  # This will also fail due to missing 'paragraphs' key
+            ("link_heavy", "rule_link_heavy", 1),
+            ("failing_rule", "failing_rule", 2),
+            ("text_heavy", "rule_text_heavy", 3)  # This will also fail due to missing 'paragraphs' key
         ]
         
         results = evaluate_catalogue_rules(response, stats, rules, thresholds)
